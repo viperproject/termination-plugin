@@ -14,5 +14,6 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="sbt: org.scala-lang:scala-library:2.12.8:jar" level="project" />
+    <orderEntry type="module" module-name="silver" />
   </component>
 </module>

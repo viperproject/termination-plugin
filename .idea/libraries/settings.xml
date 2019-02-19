@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="settings">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../silver/util/highlighting/intellij/settings.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

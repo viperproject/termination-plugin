@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="eclipse">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../silver/util/highlighting/eclipse/artifacts.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../silver/util/highlighting/eclipse/content.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
