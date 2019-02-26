@@ -1,5 +1,5 @@
 
-package viper.termination.checkcode
+package viper.termination.proofcode
 
 import viper.silver.ast._
 import viper.silver.verifier.errors.AssertFailed
@@ -44,14 +44,14 @@ class CheckDecreasesPlus(val program: Program, val decreasesMap: Map[Function, D
 
       val stmts = collection.mutable.ArrayBuffer[Stmt]()
 
-      val calledFunc = callee.func(program)
-      val calleeArgs = callee.getArgs
-
       // check the arguments
-      val termChecksOfArgs: Seq[Stmt] = calleeArgs map (a => transform(a, context))
+      val termChecksOfArgs: Seq[Stmt] = callee.getArgs map (a => transform(a, context))
       stmts.appendAll(termChecksOfArgs)
 
-      if (heights(func) == heights(calledFunc)) {
+      val calledFunc = functions(callee.funcname)
+      val calleeArgs = callee.getArgs.map(transformExp(_, context))
+
+      if (compareHeights(func, calledFunc)) {
         // In the same cycle
         val newFuncAppList = context.funcAppList :+ callee
         val newAlreadyChecked = context.alreadyChecked + callee.funcname
@@ -127,13 +127,17 @@ trait PathContext extends FunctionContext{
 case class PlusContext(func: Function, funcAppList: Seq[FuncApp], alreadyChecked: Set[String]) extends PathContext
 
 case class TerminationNoDecreasePath(offendingNode: DecreasesExp, decOrigin: Seq[Exp], decDest: Seq[Exp], offendingPath: Seq[FuncApp]) extends AbstractErrorReason {
-  val id = "termination.no.decreasing.path"
+  val id = "termination.no.decrease.path"
   override def readableMessage: String = s"Termination measure might not decrease. " +
     s"Assertion (${decDest.mkString(", ")})≺(${decOrigin.mkString(", ")}) might not hold. " +
     s"Path: ${getReadablePath(offendingPath)}."
 
   def getReadablePath(path: Seq[FuncApp]): String = {
-    path.map(f => s"$f ${f.pos}").mkString(" -> ")
+    path.map(f => s"$f@${
+      f.pos match {
+        case NoPosition =>"noPos"
+        case p: HasLineColumn => s"${p.line}.${p.column}"
+      }}").mkString(" -> ")
   }
 
   def withNode(offendingNode: errors.ErrorNode = this.offendingNode) = TerminationNoDecreasePath(this.offendingNode, decOrigin, decDest, offendingPath)
@@ -146,7 +150,11 @@ case class TerminationNoBoundPath(offendingNode: DecreasesExp, decExp: Seq[Exp],
     s"Path: ${getReadablePath(offendingPath)}."
 
   def getReadablePath(path: Seq[FuncApp]): String = {
-    path.map(f => s"$f@${f.pos}").mkString(" -> ")
+    path.map(f => s"$f@${
+      f.pos match {
+        case NoPosition =>"noPos"
+        case p: HasLineColumn => s"${p.line}.${p.column}"
+      }}").mkString(" -> ")
   }
 
   def withNode(offendingNode: errors.ErrorNode = this.offendingNode) = TerminationNoBoundPath(this.offendingNode, decExp, offendingPath)

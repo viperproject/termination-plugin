@@ -1,4 +1,4 @@
-package viper.termination.checkcode
+package viper.termination.proofcode
 
 import viper.silver.ast.utility.Functions
 import viper.silver.ast.utility.Rewriter.{StrategyBuilder, Traverse}
@@ -15,7 +15,7 @@ import scala.collection.immutable.ListMap
   *
   * It adds dummy function to the program if needed.
   */
-trait CheckDecreases[C <: FunctionContext] extends CheckProgram with NestedPredicate[C] {
+trait CheckDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredicate[C] {
 
   // all defined decreases Expressions
   val decreasesMap: Map[Function, DecreasesExp]
@@ -32,9 +32,15 @@ trait CheckDecreases[C <: FunctionContext] extends CheckProgram with NestedPredi
   }
 
   val heights: Map[Function, Int] = Functions.heights(program)
+  def compareHeights(f1: Function, f2: Function): Boolean= {
+    // guess heights are always positive
+    heights.getOrElse(f1, -1) == heights.getOrElse(f2, -2)
+  }
 
   val decreasingFunc: Option[DomainFunc] = program.findDomainFunctionOptionally("decreasing")
   val boundedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("bounded")
+
+  private val dummyFunctions: scala.collection.mutable.Map[String, Function] = scala.collection.mutable.Map[String, Function]()
 
   /**
     * Replaces all function calls in an expression with calls to dummy functions
@@ -44,14 +50,16 @@ trait CheckDecreases[C <: FunctionContext] extends CheckProgram with NestedPredi
     * @return
     */
   override def transformExp(exp: Exp, context: C): Exp = {
+    /*
     val newExp = StrategyBuilder.Slim[Node]({
-      case fa: FuncApp if heights(context.func) == heights(fa.func(program)) =>
+      case fa: FuncApp if compareHeights(context.func, functions(fa.funcname)) =>
         addDummyFunction(fa)
     }, Traverse.BottomUp)
       .execute(exp)
       .asInstanceOf[Exp]
+    */
 
-    super.transformExp(newExp, context)
+    super.transformExp(exp, context)
   }
 
   /** Generator of the dummy-Functions
@@ -60,19 +68,16 @@ trait CheckDecreases[C <: FunctionContext] extends CheckProgram with NestedPredi
     * @return the needed dummy-function
     */
   private def addDummyFunction(fa: FuncApp): FuncApp = {
-    if (functions.values.exists(_.name == fa.funcname)) {
-      FuncApp(functions.values.find(_.name == fa.funcname).get, fa.args)(fa.pos)
+    if (dummyFunctions.contains(fa.funcname)) {
+      FuncApp(dummyFunctions(fa.funcname), fa.args)(fa.pos)
     } else {
-      if (functions.contains(fa.funcname)) {
-        FuncApp(functions(fa.funcname), fa.args)(fa.pos)
-      } else {
-        val uniqueFuncName = uniqueName(fa.funcname + "_withoutBody")
-        val func = program.findFunction(fa.funcname)
-        val newFunc = Function(uniqueFuncName, func.formalArgs, func.typ, Nil, Nil, None, None)(func.pos)
-        //functions(uniqueFuncName) = newFunc
-        functions(fa.funcname) = newFunc
-        FuncApp(newFunc, fa.args)(fa.pos)
-      }
+      val uniqueFuncName = uniqueName(fa.funcname + "_withoutBody")
+      val func = program.findFunction(fa.funcname)
+      val newFunc = Function(uniqueFuncName, func.formalArgs, func.typ, Nil, Nil, None, None)(func.pos)
+
+      dummyFunctions(fa.funcname) = newFunc
+      functions(uniqueFuncName) = newFunc
+      FuncApp(newFunc, fa.args)(fa.pos)
     }
   }
 
@@ -123,48 +128,56 @@ trait CheckDecreases[C <: FunctionContext] extends CheckProgram with NestedPredi
   }
 
   /**
-    * Creates Expression to check decrease and bounded of lexicographical order
+    * If expressions are not empty
+    * creates Expression to check decrease and bounded of lexicographical order
     * (decreasing(s,b) && bounded(b)) || (s==b && ( (decr...
-    * @param biggerExp [b,..] with at least one element
+    * @param biggerExp [b,..] (can also be empty)
     * @param smallerExp [s,..] same size as biggerExp
-    * @return expression
+    * @return expression or false if expression is empty
     */
   def createTerminationCheckExp(biggerExp: Seq[Exp], smallerExp: Seq[Exp], decrReTrafo: ReTrafo, boundReTrafo: ReTrafo): Exp = {
+    assert(biggerExp.size == smallerExp.size)
+    if (biggerExp.isEmpty){
+      FalseLit()(errT = decrReTrafo)
+    }else {
 
-    val paramTypesDecr = decreasingFunc.get.formalArgs map (_.typ)
-    val argTypeVarsDecr = paramTypesDecr.flatMap(p => p.typeVariables)
-    val paramTypesBound = boundedFunc.get.formalArgs map (_.typ)
-    val argTypeVarsBound = paramTypesBound.flatMap(p => p.typeVariables)
+      val paramTypesDecr = decreasingFunc.get.formalArgs map (_.typ)
+      val argTypeVarsDecr = paramTypesDecr.flatMap(p => p.typeVariables)
+      val paramTypesBound = boundedFunc.get.formalArgs map (_.typ)
+      val argTypeVarsBound = paramTypesBound.flatMap(p => p.typeVariables)
 
 
-    def createExp(biggerExp: Seq[Exp], smallerExp: Seq[Exp]): Exp = {
-      assert(biggerExp.size == smallerExp.size)
-      val bigger = biggerExp.head
-      val smaller = smallerExp.head
-      val dec = DomainFuncApp(decreasingFunc.get,
-        Seq(smaller, bigger),
-        ListMap(argTypeVarsDecr.head -> smaller.typ,
-          argTypeVarsDecr.last -> bigger.typ))(errT = decrReTrafo)
+      def createExp(biggerExp: Seq[Exp], smallerExp: Seq[Exp]): Exp = {
+        assert(biggerExp.nonEmpty)
+        assert(biggerExp.size == smallerExp.size)
+        val bigger = biggerExp.head
+        val smaller = smallerExp.head
+        val dec = DomainFuncApp(decreasingFunc.get,
+          Seq(smaller, bigger),
+          ListMap(argTypeVarsDecr.head -> smaller.typ,
+            argTypeVarsDecr.last -> bigger.typ))(errT = decrReTrafo)
 
-      val bound = DomainFuncApp(boundedFunc.get,
-        Seq(bigger),
-        ListMap(argTypeVarsDecr.head -> bigger.typ,
-          argTypeVarsDecr.last -> bigger.typ
-        ))(errT = boundReTrafo)
+        val bound = DomainFuncApp(boundedFunc.get,
+          Seq(bigger),
+          ListMap(argTypeVarsDecr.head -> bigger.typ,
+            argTypeVarsDecr.last -> bigger.typ
+          ))(errT = boundReTrafo)
 
-      val andPart = And(dec, bound)()
+        val andPart = And(dec, bound)()
 
-      if (biggerExp.size == 1){
-        // no next elements
-        andPart
-      }else{
-        val eq = EqCmp(smaller, bigger)(errT = decrReTrafo)
-        val next = createExp(biggerExp.tail, smallerExp.tail)
-        val nextPart = And(eq, next)()
-        Or(andPart, nextPart)()
+        if (biggerExp.size == 1) {
+          // no next elements
+          andPart
+        } else {
+          val eq = EqCmp(smaller, bigger)(errT = decrReTrafo)
+          val next = createExp(biggerExp.tail, smallerExp.tail)
+          val nextPart = And(eq, next)()
+          Or(andPart, nextPart)()
+        }
       }
+
+      createExp(biggerExp, smallerExp)
     }
-    createExp(biggerExp, smallerExp)
   }
 }
 

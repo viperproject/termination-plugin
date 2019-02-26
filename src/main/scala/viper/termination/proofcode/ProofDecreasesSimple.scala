@@ -1,5 +1,5 @@
 
-package viper.termination.checkcode
+package viper.termination.proofcode
 
 import viper.silver.ast._
 import viper.silver.verifier.errors.AssertFailed
@@ -46,14 +46,14 @@ class CheckDecreasesSimple(val program: Program, val decreasesMap: Map[Function,
 
       val stmts = collection.mutable.ArrayBuffer[Stmt]()
 
-      val calledFunc = callee.func(program)
-      val calleeArgs = callee.getArgs
-
       // check the arguments
-      val termChecksOfArgs: Seq[Stmt] = calleeArgs map (a => transform(a, context))
+      val termChecksOfArgs: Seq[Stmt] = callee.getArgs map (a => transform(a, context))
       stmts.appendAll(termChecksOfArgs)
 
-      if (heights(func) == heights(calledFunc)) {
+      val calledFunc = functions(callee.funcname)
+      val calleeArgs = callee.getArgs.map(transformExp(_, context))
+
+      if (compareHeights(func, calledFunc)) {
         // In the same cycle. => compare
 
         // map of parameters in the called function to parameters in the current functions (for substitution)

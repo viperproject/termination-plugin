@@ -3,7 +3,7 @@ package viper.termination
 
 import viper.silver.ast
 import viper.silver.ast.Program
-import viper.silver.plugin.termination.checkcode.{CheckDecreasesPlus, DecreasesExp}
+import viper.silver.plugin.termination.proofcode.{CheckDecreasesPlus, DecreasesExp}
 
 
 class DecreasesPath extends DecreasesPlugin {
