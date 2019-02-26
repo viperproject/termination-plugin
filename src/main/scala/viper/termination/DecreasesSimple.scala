@@ -2,7 +2,7 @@ package viper.termination
 
 import viper.silver.ast
 import viper.silver.ast.Program
-import viper.silver.plugin.termination.proofcode.{CheckDecreasesSimple, DecreasesExp}
+import viper.termination.proofcode.{CheckDecreasesSimple, DecreasesExp}
 
 
 class DecreasesSimple extends DecreasesPlugin {

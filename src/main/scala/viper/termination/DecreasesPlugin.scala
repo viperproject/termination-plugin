@@ -5,9 +5,9 @@ import viper.silver.ast._
 import viper.silver.ast.utility.{Functions, ViperStrategy}
 import viper.silver.parser._
 import viper.silver.plugin.SilverPlugin
-import viper.silver.plugin.termination.proofcode._
 import viper.silver.verifier.errors.AssertFailed
 import viper.silver.verifier.{ConsistencyError, Failure, Success, VerificationResult}
+import viper.termination.proofcode.{DecreasesExp, DecreasesStar, DecreasesTuple}
 
 // run --printTranslatedProgram --plugin viper.silver.plugin.DecreasePlugin silver/src/test/resources/termination/basic/test.vpr
 trait DecreasesPlugin extends SilverPlugin {
