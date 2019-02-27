@@ -1,5 +1,22 @@
-name := "termination-plugin"
+// Import general settings from Silver
+lazy val silver = project in file("silver")
 
-version := "0.1"
+// Import general settings from Silver
+lazy val silicon = project in file("silicon")
 
-scalaVersion := "2.12.8"
+// Silicon specific project settings
+lazy val term = (project in file("."))
+  .dependsOn(silver % "compile->compile;test->test")
+  .dependsOn(silicon % "compile->compile;test->test")
+  .settings(
+
+    name := "termination-plugin",
+    version := "0.1",
+    scalaVersion := "2.12.8",
+
+
+  // Assembly settings
+  assembly / assemblyJarName := "termination.jar",
+  assembly / mainClass := Some("viper.silicon.SiliconRunner"),
+  assembly / test := {},
+)
