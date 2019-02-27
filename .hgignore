@@ -1,0 +1,10 @@
+syntax: glob
+.cache
+project/project/**
+project/target/**
+target/**
+.idea
+*.iml
+.DS_Store
+silicon
+silver
