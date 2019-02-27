@@ -4,7 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-package termination
+package viper.plugin.termination
+
+import viper.silicon.tests.SiliconTests
 
 class DecreasesPathTests extends SiliconTests {
   override val testDirectories: Seq[String] = Seq("termination/decreases", "termination/decreases_path")
