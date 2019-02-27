@@ -1,3 +1,5 @@
+//:: IgnoreFile(/silicon/issue/000/)
+
 //UnexpectedOutput(z3.interaction.failed)(silicon)
 
 import <decreases/int_decreases.sil>

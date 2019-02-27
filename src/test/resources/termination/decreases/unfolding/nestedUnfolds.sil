@@ -1,6 +1,6 @@
 //:: IgnoreFile(/silicon/issue/297/)
 
-import <decrease/pred_decreases.sil>
+import <decreases/pred_decreases.sil>
 
 function f1(r:Ref): Int
 requires p1(r)

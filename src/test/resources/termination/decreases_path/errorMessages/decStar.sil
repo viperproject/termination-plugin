@@ -4,12 +4,12 @@ import <decreases/int_decreases.sil>
 function f1(x:Int): Int
 ensures decreasesStar()
 {
-    f1(x) + f1(x)
+    f1(x) + f4(x)
 }
 
 function f2(x:Int): Int
 {
-    f1(x)
+    x < 0 ? f1(x) : f2(x-1)
 }
 
 function f3(x:Int): Int
@@ -20,7 +20,6 @@ function f3(x:Int): Int
 function f4(x:Int): Int
 decreases x
 {
-
-//:: ExpectedOutput(termination.failed:termination.no.decrease)
+    //:: ExpectedOutput(termination.failed:termination.star)
     f4(f1(x))
 }
