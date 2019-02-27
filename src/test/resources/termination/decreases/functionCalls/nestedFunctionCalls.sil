@@ -1,3 +1,4 @@
+//:: IgnoreFile(/silicon/issue/247/)
 import <decreases/importAllDec.sil>
 
 function f(x: Int): Int

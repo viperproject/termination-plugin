@@ -1,0 +1,110 @@
+domain P{}
+domain Q{}
+domain O{}
+
+domain Loc[T]{
+    function ref_P(xs: Ref): Loc[P]
+    function ref_Q(xs: Ref): Loc[Q]
+    function ref_O(xs: Ref): Loc[O]
+}
+
+domain NestedDomain[N1, N2, N3]{
+    function nested(l1: Loc[N1], l2: Loc[N2]): Bool
+
+    //Transitivity of the nested-Function
+    axiom nestedTrans{
+        forall l1: Loc[N1], l2: Loc[N2], l3: Loc[N3] ::
+        nested(l1,l2) && nested(l2,l3) ==> nested(l1,l3)
+    }
+}
+
+field next: Ref
+
+predicate list(xs:Ref){
+    xs != null ==> acc(xs.next) && list(xs.next)
+}
+method test(p: Ref, q: Ref, o: Ref)
+    requires list(p)
+    requires list(q)
+    requires list(o)
+{
+    var p1: Loc[P] := ref_P(p)
+    var p2: Loc[P]
+    var p3: Loc[P]
+    var p4: Loc[P]
+
+    var q1: Loc[Q] := ref_Q(q)
+    var q2: Loc[Q]
+    var q3: Loc[Q]
+    var q4: Loc[Q]
+
+    var o1: Loc[O] := ref_O(o)
+    var o2: Loc[O]
+    var o3: Loc[O]
+    var o4: Loc[O]
+
+    unfold list(p)
+    if(p != null){
+    p2 := ref_P(p.next)
+    unfold list(p.next)
+    if(p.next != null){
+    p3 := ref_P(p.next.next)
+    unfold list(p.next.next)
+    if(p.next.next != null){
+        p4:= ref_P(p.next.next.next)
+    }
+    fold list(p.next.next)
+    }
+    fold list(p.next)
+    }
+    fold list(p)
+
+    unfold list(q)
+    if(q != null){
+    q2 := ref_Q(q.next)
+    unfold list(q.next)
+    if(q.next != null){
+    q3 := ref_Q(q.next.next)
+    unfold list(q.next.next)
+    if(q.next.next != null){
+        q4:= ref_Q(q.next.next.next)
+    }
+    fold list(q.next.next)
+    }
+    fold list(q.next)
+    }
+    fold list(q)
+
+    unfold list(o)
+    if(o != null){
+    o2 := ref_O(o.next)
+    unfold list(o.next)
+    if(o.next != null){
+    o3 := ref_O(o.next.next)
+    unfold list(o.next.next)
+    if(o.next.next != null){
+        o4:= ref_O(o.next.next.next)
+    }
+    fold list(o.next.next)
+    }
+    fold list(o.next)
+    }
+    fold list(o)
+
+    inhale nested(p1, p2)
+    inhale nested(p2, p3)
+    inhale nested(p3, p4)
+
+    inhale nested(q1, q2)
+    inhale nested(q2, q3)
+    inhale nested(q3, q4)
+
+    inhale nested(o1, o2)
+    inhale nested(o2, o3)
+    inhale nested(o3, o4)
+
+
+    assert nested(p1, p4)
+
+    assert nested(q1, o4)
+}
