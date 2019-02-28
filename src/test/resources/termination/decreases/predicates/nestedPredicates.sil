@@ -1,5 +1,3 @@
-//:: IgnoreFile(/silicon/issue/297/)
-
 import <decreases/int_decreases.sil>
 import <decreases/pred_decreases.sil>
 

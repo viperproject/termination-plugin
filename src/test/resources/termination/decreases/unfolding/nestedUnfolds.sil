@@ -1,5 +1,3 @@
-//:: IgnoreFile(/silicon/issue/297/)
-
 import <decreases/pred_decreases.sil>
 
 function f1(r:Ref): Int
@@ -23,7 +21,6 @@ function f2(i: Int, s: Seq[Int]): Int
 requires p2(i)
 requires q2(s)
 ensures decreases(p2(i), q2(s))
-//decreases q2(s), p2(i)
 {
     i > 2 && |s|>2? (unfolding p2(i) in unfolding q2(s) in unfolding p2(i-1) in unfolding q2(s[1..]) in f2(i-1-1, s[1..][1..])) : 7
 }

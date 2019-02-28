@@ -3,7 +3,7 @@ package viper.termination.proofcode
 import viper.silver.FastMessaging
 import viper.silver.ast.utility.Consistency
 import viper.silver.ast.utility.Statements.EmptyStmt
-import viper.silver.ast.{AccessPredicate, BinExp, CondExp, Domain, DomainFunc, DomainFuncApp, DomainType, Exp, FieldAccessPredicate, Fold, Function, If, Implies, Inhale, Int, LocalVar, LocalVarAssign, LocalVarDecl, MagicWand, NoPosition, PredicateAccess, PredicateAccessPredicate, Program, Seqn, SimpleInfo, Stmt, Type, TypeVar, UnExp, Unfold, Unfolding}
+import viper.silver.ast.{AccessPredicate, BinExp, CondExp, Domain, DomainFunc, DomainFuncApp, DomainType, Exp, FieldAccessPredicate, Fold, Function, If, Implies, Inhale, Int, LocalVar, LocalVarAssign, LocalVarDecl, MagicWand, PredicateAccess, PredicateAccessPredicate, Program, Seqn, SimpleInfo, Stmt, Type, TypeVar, UnExp, Unfold, Unfolding}
 
 import scala.collection.immutable.ListMap
 
@@ -26,6 +26,7 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
   override def clear(): Unit = {
     neededLocFunctions.clear()
     neededLocalVars.clear()
+    super.clear()
   }
 
   /**
@@ -53,7 +54,6 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
     * Transforms an expression (e.g. function body) into a statement.
     * Parts of the expressions which stay expressions (e.g. the condition in a if clause)
     * are added in front as statements.
-    * TODO: Expressions which cannot be transformed to statements (e.g. literals) are replaced
     * by the transfromExp.
     *
     * @return a statement representing the expression
@@ -97,7 +97,7 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
   }
 
   /**
-    * Traverses a predicate body and adds corresponding inhales of the 'nested'-Relation
+    * Traverses a predicate body (once) and adds corresponding inhales of the 'nested'-Relation
     * iff a predicate is inside of this body
     *
     * @param body     the part of the predicate-body which should be analyzed
@@ -105,17 +105,12 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
     * @return statements with the generated inhales: (Inhale(nested(pred1, pred2)))
     */
   def transformPredicateBody(body: Exp, origPred: PredicateAccessPredicate, context: FunctionContext): Stmt = {
-    // TODO: shouldn't the expression be checked for termination or at least replaced with dummy
     body match {
       case ap: AccessPredicate => ap match {
         case FieldAccessPredicate(_, _) => EmptyStmt
         case calledPred: PredicateAccessPredicate =>
           assert(locationDomain.isDefined)
           assert(nestedFunc.isDefined)
-
-          //predicate-Domains (p_PredName)
-          val domainOfCallerPred: Domain = addPredicateDomain(origPred.loc).asInstanceOf[Domain]
-          val domainOfCalleePred: Domain = addPredicateDomain(calledPred.loc).asInstanceOf[Domain]
 
           //local variables
           val varOfCallerPred: LocalVar = uniquePredLocVar(origPred.loc, context)
@@ -125,26 +120,16 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
           val assign1 = generateAssign(origPred, varOfCallerPred)
           val assign2 = generateAssign(calledPred, varOfCalleePred)
 
-          //println(assign1.lhs + ": " + assign1.lhs.typ)
-          //println(assign1.rhs + ": " + assign1.rhs.typ)
-          //println(assign2.lhs + ": " + assign2.lhs.typ)
-          //println(assign2.rhs + ": " + assign2.rhs.typ)
-
           //inhale nested-relation
           val params: Seq[TypeVar] = program.findDomain(nestedFunc.get.domainName).typVars
           val types: Seq[Type] =
-            Seq(DomainType(domainOfCalleePred, ListMap()), DomainType(domainOfCallerPred, ListMap()), Int)
-          //println(types)
+            Seq(DomainType(locationDomain.get, ListMap()), DomainType(locationDomain.get, ListMap()), Int)
+
           val mapNested: ListMap[TypeVar, Type] = ListMap(params.zip(types):_*)
           val inhale = Inhale(DomainFuncApp(nestedFunc.get,
             Seq(varOfCalleePred, varOfCallerPred),
             mapNested)(calledPred.pos))(calledPred.pos)
-          // TODO: NOT WORKING: Z3 ERROR!
-          //Seqn(Seq(assign1, assign2, assume), Nil)(calledPred.pos)
-          // the assignments are probably necessary for soundness.
-          //Seqn(Seq(assign2), Nil)(calledPred.pos)
-          Seqn(Seq(inhale), Nil)(calledPred.pos)
-          //EmptyStmt
+          Seqn(Seq(assign1, assign2, inhale), Nil)(calledPred.pos)
         case mw: MagicWand =>
           sys.error(s"Unexpectedly found resource access node $mw")
       }
@@ -176,17 +161,15 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
     */
   def generateAssign(pred: PredicateAccessPredicate, assLocation: LocalVar, argMap: ListMap[Exp, Exp] = ListMap.empty)
   : LocalVarAssign = {
-    val domainOfPred: Domain = addPredicateDomain(pred.loc)
     val domainFunc = addPredicateDomainFunction(pred)
-    val typVarMap: ListMap[TypeVar, Type] =
-      ListMap(TypeVar(locationDomain.get.typVars.head.name) -> DomainType(domainOfPred, ListMap()))
+    val typVarMap: ListMap[TypeVar, Type] = ListMap()
     val assValue = DomainFuncApp(domainFunc, pred.loc.args.map(_.replace(argMap)), typVarMap)(pred.pos)
     LocalVarAssign(assLocation, assValue)(pred.pos)
   }
 
   /**
     * Generator of the predicate-variables, which represents the type 'predicate'.
-    *
+    * The new variable is added to neededLocalVars, which then should be added to the method.
     * @param p      predicate which defines the type of the variable
     * @return a local variable with the correct type
     */
@@ -203,32 +186,10 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
       val info = SimpleInfo(Seq(p.predicateName + "_" + p.args.mkString(",")))
       val newLocalVar =
         LocalVar(predVarName)(DomainType(locationDomain.get,
-          ListMap(TypeVar(locationDomain.get.typVars.head.name)
-            -> DomainType(addPredicateDomain(p), ListMap()))),
+          ListMap()),
           info = info)
       neededLocalVars(func)(predVarName) = LocalVarDecl(newLocalVar.name, newLocalVar.typ)(newLocalVar.pos, info)
       newLocalVar
-    }
-  }
-
-  /**
-    * Creates a domain representing the predicate and adds it to the program domains,
-    * if not yet done
-    * @param pa PredicateAccess to the predicate.
-    * @return Domain of the predicate
-    */
-  private def addPredicateDomain(pa: PredicateAccess): Domain = {
-    if (domains.values.exists(_.name == pa.predicateName)) {
-      domains.values.find(_.name == pa.predicateName).get
-    } else {
-      if (domains.contains(pa.predicateName)) {
-        domains(pa.predicateName)
-      } else {
-        val uniquePredName = uniqueName(pa.predicateName + "_PredName")
-        val newDomain = Domain(uniquePredName, Nil, Nil, Nil)(NoPosition)
-        domains(pa.predicateName) = newDomain
-        newDomain
-      }
     }
   }
 
@@ -248,7 +209,7 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
           DomainFunc(uniquePredFuncName,
             pred.formalArgs,
             DomainType(locationDomain.get,
-              ListMap(locationDomain.get.typVars.head -> locationDomain.get.typVars.head))
+              ListMap())
           )(locationDomain.get.pos, locationDomain.get.info, locationDomain.get.name, locationDomain.get.errT)
 
         neededLocFunctions(pap.loc.predicateName) = newLocFunc
