@@ -1,3 +1,5 @@
+//:: IgnoreFile(/silicon/issue/000/)
+
 import <decreases/pred_decreases.sil>
 
 function f1(r:Ref): Int

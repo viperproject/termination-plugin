@@ -1,19 +1,19 @@
-domain Loc[T]{
+domain Loc{
 }
 
-domain nestedDomain[N1, N2, N3]{
+domain nestedDomain{
 
-    function nested(l1: Loc[N1], l2: Loc[N2]) : Bool
+    function nested(l1: Loc, l2: Loc) : Bool
     
     //Transitivity of the nested-Function
     axiom nestedTrans{
-        forall l1: Loc[N1], l2: Loc[N2], l3: Loc[N3] ::
+        forall l1: Loc, l2: Loc, l3: Loc ::
         nested(l1,l2) && nested(l2,l3) ==> nested(l1,l3)
     }
     
     //A predicate cannot be nested inside itself
     axiom nestedReflex{
-        forall l1: Loc[N1] ::
+        forall l1: Loc ::
         !nested(l1, l1)
     }
 }
