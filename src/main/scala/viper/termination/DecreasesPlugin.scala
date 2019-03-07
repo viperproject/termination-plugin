@@ -17,11 +17,15 @@ trait DecreasesPlugin extends SilverPlugin {
   private val DECREASESSTAR = "decreasesStar"
 
   /** Called after parse AST has been constructed but before identifiers are resolved and the program is type checked.
-    * Replaces all decreases function calls in postconditions, replaces them with decreasesN function calls and
+    * Replaces all decreases function calls in postconditions with decreasesN function calls and
     * adds a domain with the necessary decreasesN functions.
-    * Replaces all predicates acc in decreases function calls, replaces them with function calls.
-    * @param input Parse AST
-    * @return Modified Parse AST
+    * decreasesN functions are domain functions with N parameters of arbitrary type.
+    * Replaces all predicates acc in decreases function calls, replaces them with function calls, representing the
+    * the predicate acc.
+    * Replaces all decreasesStar function calls in postconditions with unique decreasesStar function calls
+    * and adds a domain with the unique function.
+    * @param input Parse AST possibly containing the decreases clauses in postconditions
+    * @return Modified Parse AST which now should type check
     */
   override def beforeResolve(input: PProgram): PProgram = {
     // replace all decreases (calls in postconditions)
@@ -138,14 +142,18 @@ trait DecreasesPlugin extends SilverPlugin {
 
 
   /** Called after parse AST has been translated into the normal AST but before methods to verify are filtered.
-    * In [[viper.silver.frontend.SilFrontend]] this step is confusingly called doTranslate.
-    *
+    * Replace all decreasesN function calls in postconditions (from the beforeResolve step)
+    * with DecreasesTuple expressions.
+    * Replaces all function calls representing a predicate acc (from the beforeResolve step)
+    * with predicate acc.
+    * Replaces all decreasesStar functions in postconditions (from the beforeResolve step)
+    * with DecreasesStar expressions.
     * @param input AST
-    * @return Modified AST
+    * @return Modified AST possibly with DecreasesExp (DecreasesTuple or DecreasesStar) in the postconditions of functions.
     */
   override def beforeMethodFilter(input: Program): Program = {
-    // get decrease in post conditions and
-    // transform them to post condition with a DecreaseExp
+    // get decreases function calls in post conditions and
+    // transform them to post condition with a DecreasesExp
     // also transform all functions representing predicates back
 
     val helperDomain = getHelperDomain
@@ -178,28 +186,22 @@ trait DecreasesPlugin extends SilverPlugin {
             DecreasesTuple(newArgs, c.pos, NodeTrafo(c))
           case p => p
         }
-        Function(
-          name = f.name,
-          posts = posts,
-          formalArgs = f.formalArgs,
-          typ = f.typ,
-          pres = f.pres,
-          decs = f.decs,
-          body = f.body,
-        )(f.pos, f.info, f.errT)
+        Function(name = f.name, formalArgs = f.formalArgs, typ = f.typ, pres = f.pres, posts = posts, body = f.body)(f.pos, f.info, f.errT)
     }).execute(input)
 
   }
 
   /** Called after methods are filtered but before the verification by the backend happens.
-    *
-    * @param input AST
-    * @return Modified AST
+    * Checks that functions are not (indirectly) recursively defined via its DecreasesExp or multiple DecreasesExp are
+    * defined for one functions (otherwise consistency errors are reported and the verification stopped).
+    * Extracts all DecreasesExp from the postcondition of functions and uses them to create proof code.
+    * @param input AST possibly with DecreasesExp (DecreasesTuple or DecreasesStar) in the postconditions of functions.
+    * @return Modified AST without DecreasesExp in postconditions of functions.
     */
   override def beforeVerify(input: Program): Program = {
     // remove all post conditions which are DecreaseExp
     // and add them to the decreaseMap functions -> decreases map
-    val errors = checkNoFunctionRecursesViaDecreasesClause(input)
+    val errors = checkNoFunctionRecursesViaDecreasesClause(input) ++ checkNoMultipleDecreasesClause(input)
     if (errors.nonEmpty){
       for (e <- errors) {
         reportError(e)
@@ -207,7 +209,7 @@ trait DecreasesPlugin extends SilverPlugin {
       return input
     }
 
-    val removedDecreasesExp = removeDecreaseExp(input)
+    val removedDecreasesExp = extractDecreasesExp(input)
     //val removedDecreasesExp = getDecreaseExpFromDecrease(input)
 
     val newProgram: Program = removedDecreasesExp._1
@@ -233,13 +235,19 @@ trait DecreasesPlugin extends SilverPlugin {
   }
 
   /**
-    * Creates a Program containing all the wanted termination checks
-    * @param input program
+    * Creates a Program containing all the wanted termination checks (defined by a concrete plugin)
+    * @param input verifiable program (i.e. no DecreasesExp in postconditions)
     * @param decreasesMap all decreases exp (defined by the user)
-    * @return a program with the additional termination checks (including normal program)
+    * @return a program with the additional termination checks (including the input program)
     */
   def transformToCheckProgram(input: Program, decreasesMap: Map[Function, DecreasesExp]): Program
 
+  /**
+    * Checks if a function is defined recursively via its decrease clause (DecreasesExp in postconditions),
+    * which is not allowed in this case.
+    * @param program containing functions to be checked
+    * @return consistency error if cycles are detected.
+    */
   private def checkNoFunctionRecursesViaDecreasesClause(program: Program): Seq[ConsistencyError] = {
 
     def functionDecs(function:Function) = function.posts.filter(p => p.isInstanceOf[DecreasesExp])
@@ -256,7 +264,29 @@ trait DecreasesPlugin extends SilverPlugin {
     errors
   }
 
-  private def removeDecreaseExp(program: Program): (Program, Map[Function, DecreasesExp]) = {
+  /**
+    * Checks if each function only contains at max one decreases clause (DecreasesExp in postconditions).
+    * @param program containing the functions to be checked
+    * @return consistency error if function with multiple decreases clauses are detected.
+    */
+  private def checkNoMultipleDecreasesClause(program: Program): Seq[ConsistencyError] = {
+    var errors = Seq.empty[ConsistencyError]
+    program.functions.foreach(f => {
+      if (f.posts.count(_.isInstanceOf[DecreasesExp]) > 1){
+        // more than one decreases clause detected for function f
+        val msg = s"Function ${f.name} contains more than one decreases clause."
+        errors :+= ConsistencyError(msg, f.pos)
+      }
+    })
+    errors
+  }
+
+  /**
+    * Extracts one(!) DecreasesExp in functions postconditions.
+    * @param program with at most one(!) DecreasesExp in functions postcondition.
+    * @return verifiable program (i.e. without DecreasesExp in functions postconditions)
+    */
+  private def extractDecreasesExp(program: Program): (Program, Map[Function, DecreasesExp]) = {
     val decreaseMap = scala.collection.mutable.Map[Function, DecreasesExp]()
 
     val result: Program = ViperStrategy.Slim({
@@ -265,26 +295,15 @@ trait DecreasesPlugin extends SilverPlugin {
         val decreases = partition._1
         val posts = partition._2
 
-        if (decreases.size == 1) {
+        if (decreases.nonEmpty) {
+          // one DecreasesExp found
           val newFunction =
-            Function(
-              name = f.name,
-              posts = posts,
-              formalArgs = f.formalArgs,
-              typ = f.typ,
-              pres = f.pres,
-              decs = f.decs,
-              body = f.body,
-            )(f.pos, f.info, f.errT)
+            Function(name = f.name, formalArgs = f.formalArgs, typ = f.typ, pres = f.pres, posts = posts, body = f.body)(f.pos, f.info, f.errT)
 
           if (decreases.nonEmpty) {
             decreaseMap += (newFunction -> decreases.head.asInstanceOf[DecreasesExp])
           }
           newFunction
-        }else if (decreases.nonEmpty){
-          // more than one decreases clause
-          reportError(ConsistencyError("More than one decreases clauses are defined.", f.pos))
-          f
         } else {
           // none decreases clause
           f

@@ -127,7 +127,7 @@ trait PathContext extends FunctionContext{
 case class PlusContext(func: Function, funcAppList: Seq[FuncApp], alreadyChecked: Set[String]) extends PathContext
 
 case class TerminationNoDecreasePath(offendingNode: DecreasesExp, decOrigin: Seq[Exp], decDest: Seq[Exp], offendingPath: Seq[FuncApp]) extends AbstractErrorReason {
-  val id = "termination.no.decrease.path"
+  val id = "termination.no.decrease"
   override def readableMessage: String = s"Termination measure might not decrease. " +
     s"Assertion (${decDest.mkString(", ")})≺(${decOrigin.mkString(", ")}) might not hold. " +
     s"Path: ${getReadablePath(offendingPath)}."
@@ -144,7 +144,7 @@ case class TerminationNoDecreasePath(offendingNode: DecreasesExp, decOrigin: Seq
 }
 
 case class TerminationNoBoundPath(offendingNode: DecreasesExp, decExp: Seq[Exp], offendingPath: Seq[FuncApp]) extends AbstractErrorReason {
-  val id = "termination.no.bound.path"
+  val id = "termination.no.bound"
   override def readableMessage: String = s"Termination measure might not be bounded. " +
     s"Assertion 0≺(${decExp.mkString(", ")}) might not hold. " +
     s"Path: ${getReadablePath(offendingPath)}."

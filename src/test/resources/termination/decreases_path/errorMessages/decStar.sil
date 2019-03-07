@@ -18,7 +18,7 @@ function f3(x:Int): Int
 }
 
 function f4(x:Int): Int
-decreases x
+ensures decreases(x)
 {
     //:: ExpectedOutput(termination.failed:termination.star)
     f4(f1(x))

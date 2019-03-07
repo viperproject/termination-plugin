@@ -73,7 +73,7 @@ trait CheckDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredi
     } else {
       val uniqueFuncName = uniqueName(fa.funcname + "_withoutBody")
       val func = program.findFunction(fa.funcname)
-      val newFunc = Function(uniqueFuncName, func.formalArgs, func.typ, Nil, Nil, None, None)(func.pos)
+      val newFunc = Function(uniqueFuncName, func.formalArgs, func.typ, Nil, Nil, None)(func.pos)
 
       dummyFunctions(fa.funcname) = newFunc
       functions(uniqueFuncName) = newFunc

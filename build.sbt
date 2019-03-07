@@ -17,5 +17,5 @@ lazy val term = (project in file("."))
   // Assembly settings
   assembly / assemblyJarName := "termination.jar",
   assembly / mainClass := None,
-  assembly / test := {},
+  assembly / test := {}
 )

@@ -15,7 +15,7 @@ ensures decreases(y)
 function g2(y : Int, q: Seq[Int]) : Int
 ensures decreases(q)
 {
-    //:: ExpectedOutput(termination.failed:termination.no.decrease.path)
+    //:: ExpectedOutput(termination.failed:termination.no.decrease)
     |q| <= 1 ? 1 : g(y,q[1..])
 }
 

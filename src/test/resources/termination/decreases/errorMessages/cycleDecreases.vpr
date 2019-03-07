@@ -1,0 +1,16 @@
+import <decreases/int_decreases.sil>
+
+//:: ExpectedOutput(consistency.error)
+function fun1(x: Int): Int
+requires x >= 0
+ensures decreases(fun2(x-1))
+{
+  x == 0 ? 0 : fun2(x-1) + 1
+}
+
+function fun2(x: Int): Int
+requires x >= 0
+ensures decreases(x)
+{
+  x == 0 ? 0 : fun1(x-1) + 1
+}
