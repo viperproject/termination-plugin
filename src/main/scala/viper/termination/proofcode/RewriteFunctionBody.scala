@@ -6,7 +6,7 @@ import viper.silver.ast._
 /**
   * A basic interface which helps to write a function body (Exp) into a method body (Stmt).
   * Some basic transformations are already implemented.
-  * @tparam C: the context in which an expression is transformed
+  * @tparam C: the context in which an expression is transformed.
   */
 trait RewriteFunctionBody[C <: Context] {
 

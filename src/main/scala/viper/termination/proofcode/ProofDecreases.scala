@@ -1,9 +1,9 @@
 package viper.termination.proofcode
 
 import viper.silver.ast.utility.Functions
-import viper.silver.ast.utility.Rewriter.{StrategyBuilder, Traverse}
-import viper.silver.ast.{And, Assert, DomainFunc, DomainFuncApp, EqCmp, ErrTrafo, Exp, FalseLit, FuncApp, Function, LocalVar, Node, NodeTrafo, Old, Or, PredicateAccess, ReTrafo, Unfolding}
-import viper.silver.verifier.{AbstractVerificationError, ErrorReason, errors}
+import viper.silver.ast.utility.Statements.EmptyStmt
+import viper.silver.ast.{And, Assert, DomainFunc, DomainFuncApp, EqCmp, ErrTrafo, Exp, FalseLit, FuncApp, Function, LocalVar, Node, NodeTrafo, Old, Or, Position, PredicateAccess, ReTrafo, Stmt, Unfolding}
+import viper.silver.verifier.{AbstractVerificationError, ConsistencyError, ErrorReason, errors}
 
 import scala.collection.immutable.ListMap
 
@@ -58,7 +58,6 @@ trait CheckDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredi
       .execute(exp)
       .asInstanceOf[Exp]
     */
-
     super.transformExp(exp, context)
   }
 
@@ -82,44 +81,70 @@ trait CheckDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredi
   }
 
   /**
-    * Creates a termination check
+    * Creates a termination check.
+    * If decreasing and bounded functions are not defined a consistency error is reported.
     * @param biggerDec DecreaseExp of the function currently checked
     * @param smallerDec DecreaseExp of the function called
-    * @return termination check as a Assert Stmt
+    * @param argMap Substitutions for smallerDec
+    * @param errTrafo for termination related assertions
+    * @param reasonTrafoFactory for termination related assertion reasons
+    * @param context of the current termination check
+    * @return termination check as a Assert Stmt (if decreasing and bounded are defined, otherwise EmptyStmt)
     */
   def createTerminationCheck(biggerDec: DecreasesExp, smallerDec: DecreasesExp, argMap: Map[LocalVar, Node],
-                             errTrafo: ErrTrafo, reasonTrafoFactory: ReasonTrafoFactory, context: FunctionContext): Assert = {
+                             errTrafo: ErrTrafo, reasonTrafoFactory: ReasonTrafoFactory, context: FunctionContext): Stmt = {
     (biggerDec, smallerDec) match {
       case (DecreasesTuple(_,_,_), DecreasesStar(_,_)) =>
         val reTStar = reasonTrafoFactory.createStar(context)
         Assert(FalseLit()(errT = reTStar))(errT = errTrafo)
       case (DecreasesTuple(biggerExp,_,_), DecreasesTuple(smallerExp,_,_)) =>
-        // trims to the longest commonly typed prefix
-        val (bExp, sExp) = (biggerExp zip smallerExp.map(_.replace(argMap))).takeWhile(exps => exps._1.typ == exps._2.typ).unzip
+        // decreasing and bounded functions are needed
+        if(decreasingFunc.isDefined && boundedFunc.isDefined) {
+          // trims to the longest commonly typed prefix
+          val (bExp, sExp) = (biggerExp zip smallerExp.map(_.replace(argMap))).takeWhile(exps => exps._1.typ == exps._2.typ).unzip
 
-        val reTBound = reasonTrafoFactory.createNotBounded(bExp, context)
+          val reTBound = reasonTrafoFactory.createNotBounded(bExp, context)
 
-        val reTDec = reasonTrafoFactory.createNotDecrease(bExp, sExp, context)
+          val reTDec = reasonTrafoFactory.createNotDecrease(bExp, sExp, context)
 
-        val checkableBiggerExp = bExp.map({
-          case pa: PredicateAccess =>
-            assert(locationDomain.isDefined)
-            val varOfCalleePred = uniquePredLocVar(pa, context)
-            varOfCalleePred
-          case unfold: Unfolding => Old(unfold)(unfold.pos)
-          case default => default
-        })
+          val checkableBiggerExp = bExp.map({
+            case pa: PredicateAccess =>
+              if (locationDomain.isDefined) {
+                val varOfCalleePred = uniquePredLocVar(pa, context)
+                varOfCalleePred
+              } else {
+                reportLocNotDefined(biggerDec.pos)
+                pa
+              }
+            case unfold: Unfolding => Old(unfold)(unfold.pos)
+            case default => default
+          })
 
-        val checkableSmallerExp = sExp.map({
-          case pa: PredicateAccess =>
-            val varOfCalleePred = uniquePredLocVar(pa, context)
-            varOfCalleePred
-          case default => default
-        })
+          val checkableSmallerExp = sExp.map({
+            case pa: PredicateAccess =>
+              if (locationDomain.isDefined) {
+                val varOfCalleePred = uniquePredLocVar(pa, context)
+                varOfCalleePred
+              } else {
+                reportLocNotDefined(biggerDec.pos)
+                pa
+              }
+            case default => default
+          })
 
-        val check = createTerminationCheckExp(checkableBiggerExp, checkableSmallerExp, reTDec, reTBound)
+          val check = createTerminationCheckExp(checkableBiggerExp, checkableSmallerExp, reTDec, reTBound)
 
-        Assert(check)(errT = errTrafo)
+          Assert(check)(errT = errTrafo)
+        }else{
+          // at least of the needed functions is not defined
+          if (decreasingFunc.isEmpty){
+            reportDecreasingNotDefined(biggerDec.pos)
+          }
+          if (boundedFunc.isEmpty){
+            reportBoundedNotDefined(biggerDec.pos)
+          }
+          EmptyStmt
+        }
       case default =>
         assert(assertion = false, "Checking a function with DecreasesStar for termination!" +
           "This should not happen!")
@@ -131,21 +156,23 @@ trait CheckDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredi
     * If expressions are not empty
     * creates Expression to check decrease and bounded of lexicographical order
     * (decreasing(s,b) && bounded(b)) || (s==b && ( (decr...
+    * decreasing and bounded must be defined!
     * @param biggerExp [b,..] (can also be empty)
     * @param smallerExp [s,..] same size as biggerExp
     * @return expression or false if expression is empty
     */
   def createTerminationCheckExp(biggerExp: Seq[Exp], smallerExp: Seq[Exp], decrReTrafo: ReTrafo, boundReTrafo: ReTrafo): Exp = {
     assert(biggerExp.size == smallerExp.size)
+    assert(decreasingFunc.isDefined)
+    assert(boundedFunc.isDefined)
+
     if (biggerExp.isEmpty){
       FalseLit()(errT = decrReTrafo)
     }else {
-
       val paramTypesDecr = decreasingFunc.get.formalArgs map (_.typ)
       val argTypeVarsDecr = paramTypesDecr.flatMap(p => p.typeVariables)
       val paramTypesBound = boundedFunc.get.formalArgs map (_.typ)
       val argTypeVarsBound = paramTypesBound.flatMap(p => p.typeVariables)
-
 
       def createExp(biggerExp: Seq[Exp], smallerExp: Seq[Exp]): Exp = {
         assert(biggerExp.nonEmpty)
@@ -179,12 +206,23 @@ trait CheckDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredi
       createExp(biggerExp, smallerExp)
     }
   }
+
+  def reportDecreasingNotDefined(pos: Position): Unit = {
+    reportError(ConsistencyError("Decreasing function is needed but not defined.", pos))
+  }
+
+  def reportBoundedNotDefined(pos: Position): Unit = {
+    reportError(ConsistencyError("Bounded function is needed but not defined.", pos))
+  }
 }
 
 trait FunctionContext extends Context{
   val func: Function
 }
 
+/**
+  * Error for all termination related failed assertions.
+  */
 case class TerminationFailed(offendingNode: FuncApp, reason: ErrorReason, override val cached: Boolean = false) extends AbstractVerificationError {
   val id = "termination.failed"
   val text = s"Function might not terminate."
@@ -193,6 +231,9 @@ case class TerminationFailed(offendingNode: FuncApp, reason: ErrorReason, overri
   def withReason(r: ErrorReason) = TerminationFailed(offendingNode, r)
 }
 
+/**
+  * Interface for factories creating trafos of non-termination reasons.
+  */
 trait ReasonTrafoFactory{
   def createNotDecrease(biggerDec: Seq[Exp], smallerDec: Seq[Exp], context: Context): ReTrafo
   def createNotBounded(biggerDec: Seq[Exp], context: Context): ReTrafo

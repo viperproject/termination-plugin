@@ -9,7 +9,7 @@ import viper.termination.proofcode._
 import viper.silver.verifier.errors.AssertFailed
 import viper.silver.verifier.{ConsistencyError, Failure, Success, VerificationResult}
 
-// run --printTranslatedProgram --plugin viper.silver.plugin.DecreasePlugin silver/src/test/resources/termination/basic/test.vpr
+
 trait DecreasesPlugin extends SilverPlugin {
 
   // decreases keywords
@@ -28,7 +28,7 @@ trait DecreasesPlugin extends SilverPlugin {
     * @return Modified Parse AST which now should type check
     */
   override def beforeResolve(input: PProgram): PProgram = {
-    // replace all decreases (calls in postconditions)
+    // replace all decreases (calls in postconditions of functions)
     // with decreasesN calls
     // and add DecreasesDomain with all needed decreasesN functions
 
@@ -64,6 +64,9 @@ trait DecreasesPlugin extends SilverPlugin {
     input.copy(functions = functions, domains = domains).setPos(input)
   }
 
+  /**
+    * @return unique name for the decreasesStar function
+    */
   private def getDecreasesStarFunction: String = {
     "$decreasesStar"
   }
@@ -76,7 +79,8 @@ trait DecreasesPlugin extends SilverPlugin {
   private val decreasesNFunctions = collection.mutable.Map[Integer, String]()
 
   /**
-    * Lazy map using the decreasesNFunctions
+    * Adds a new function name to the decreasesNFunctions map if none exists for this
+    * many arguments.
     * @param argsSize: number of arguments needed
     * @return name of decrease function
     */
@@ -95,6 +99,13 @@ trait DecreasesPlugin extends SilverPlugin {
     */
   private val predicateFunctions = collection.mutable.Map[(String, Seq[PFormalArgDecl]), String]()
 
+  /**
+    * Adds a new predicate representing function's name to the predicateFunction map
+    * if none exists for this predicate.
+    * @param predicateName identifying the predicate
+    * @param args number of arguments of the predicate
+    * @return name of the function
+    */
   private  def addPredicateFunctions(predicateName: String, args: Seq[PFormalArgDecl]): String = {
     if (!predicateFunctions.contains((predicateName, args))){
       val functionName: String = s"$$pred_$predicateName"
@@ -107,6 +118,14 @@ trait DecreasesPlugin extends SilverPlugin {
     "$HelperDomain"
   }
 
+  /**
+    * Creates a domain with some parameter types and containing the necessary domain functions.
+    * @param name (unique) name of the domain
+    * @param decreasesStar (unique) name of the decreasesStar function (
+    * @param decreasesN (unique) names of decreasesN functions (and number of arguments: N)
+    * @param predicates (unique) names of functions representing predicates (and number of arguments)
+    * @return domain containing all the wanted functions.
+    */
   private def createHelperDomain(name: String, decreasesStar: String,
                                  decreasesN: Map[Integer, String],
                                  predicates: Map[(String, Seq[PFormalArgDecl]), String]): PDomain = {
@@ -199,8 +218,6 @@ trait DecreasesPlugin extends SilverPlugin {
     * @return Modified AST without DecreasesExp in postconditions of functions.
     */
   override def beforeVerify(input: Program): Program = {
-    // remove all post conditions which are DecreaseExp
-    // and add them to the decreaseMap functions -> decreases map
     val errors = checkNoFunctionRecursesViaDecreasesClause(input) ++ checkNoMultipleDecreasesClause(input)
     if (errors.nonEmpty){
       for (e <- errors) {
@@ -209,11 +226,12 @@ trait DecreasesPlugin extends SilverPlugin {
       return input
     }
 
-    val removedDecreasesExp = extractDecreasesExp(input)
-    //val removedDecreasesExp = getDecreaseExpFromDecrease(input)
+    // extract decreases expressions from the program
+    val extractedDecreasesExp = extractDecreasesExp(input)
 
-    val newProgram: Program = removedDecreasesExp._1
-    val decreasesMap = removedDecreasesExp._2
+    val newProgram: Program = extractedDecreasesExp._1
+    val decreasesMap = extractedDecreasesExp._2
+
     transformToCheckProgram(newProgram, decreasesMap)
   }
 

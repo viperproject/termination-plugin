@@ -3,18 +3,17 @@ package viper.termination.proofcode
 
 import viper.silver.ast._
 import viper.silver.verifier.errors.AssertFailed
-import viper.silver.verifier.{AbstractErrorReason, errors}
+import viper.silver.verifier.{AbstractError, AbstractErrorReason, errors}
 import viper.silver.verifier.reasons.AssertionFalse
 
 import scala.collection.immutable.ListMap
 
-class CheckDecreasesPlus(val program: Program, val decreasesMap: Map[Function, DecreasesExp]) extends CheckDecreases[PlusContext]{
+class ProofDecreasesPath(val program: Program, val decreasesMap: Map[Function, DecreasesExp], val reportError: AbstractError => Unit) extends CheckDecreases[PathContext]{
 
-  override def createCheckProgram(): Program = {
-    this.clear()
-
+  override protected def createCheckProgram(): Program = {
+    // add termination check methods for all function (without the ones with empty body and decreases star)
     program.functions.filterNot(f => f.body.isEmpty || getDecreasesExp(f).isInstanceOf[DecreasesStar]).foreach(f => {
-      val context = PlusContext(f, Nil, Set.empty + f.name)
+      val context = PathContext(f, Nil, Set.empty + f.name)
       val body = transform(f.body.get, context)
       val localVars = neededLocalVars.get(f) match {
         case Some(v) => v.values
@@ -32,14 +31,13 @@ class CheckDecreasesPlus(val program: Program, val decreasesMap: Map[Function, D
   }
 
   /**
-    * Adds case FuncApp
-    * Checks if the termination measure decreases in every function call (to a possibly
-    * recursive call)
-    *
-    * @return a statement representing the expression
+    * Adds case FuncApp.
+    * Inlines function calls (if the functions have the same height) until a loop is detected.
+    * Then checks if the termination measure decreased     *
+    * @return a statement containing all the inlining and the termination checks
     */
-  override def transform: PartialFunction[(Exp, PlusContext), Stmt] = {
-    case (callee: FuncApp, context: PlusContext) =>
+  override def transform: PartialFunction[(Exp, PathContext), Stmt] = {
+    case (callee: FuncApp, context: PathContext) =>
       val func = context.func
 
       val stmts = collection.mutable.ArrayBuffer[Stmt]()
@@ -120,11 +118,7 @@ class CheckDecreasesPlus(val program: Program, val decreasesMap: Map[Function, D
   }
 }
 
-trait PathContext extends FunctionContext{
-  val funcAppList: Seq[FuncApp]
-}
-
-case class PlusContext(func: Function, funcAppList: Seq[FuncApp], alreadyChecked: Set[String]) extends PathContext
+case class PathContext(func: Function, funcAppList: Seq[FuncApp], alreadyChecked: Set[String]) extends FunctionContext
 
 case class TerminationNoDecreasePath(offendingNode: DecreasesExp, decOrigin: Seq[Exp], decDest: Seq[Exp], offendingPath: Seq[FuncApp]) extends AbstractErrorReason {
   val id = "termination.no.decrease"

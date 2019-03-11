@@ -3,16 +3,14 @@ package viper.termination.proofcode
 
 import viper.silver.ast._
 import viper.silver.verifier.errors.AssertFailed
-import viper.silver.verifier.{AbstractErrorReason, errors}
+import viper.silver.verifier.{AbstractError, AbstractErrorReason, errors}
 import viper.silver.verifier.reasons.AssertionFalse
 
 import scala.collection.immutable.ListMap
 
-class CheckDecreasesSimple(val program: Program, val decreasesMap: Map[Function, DecreasesExp]) extends CheckDecreases[FunctionContext] {
+class CheckDecreasesSimple(val program: Program, val decreasesMap: Map[Function, DecreasesExp], val reportError: AbstractError => Unit) extends CheckDecreases[FunctionContext] {
 
-  override def createCheckProgram(): Program = {
-    this.clear()
-
+  override protected def createCheckProgram(): Program = {
     program.functions.filterNot(f => f.body.isEmpty || getDecreasesExp(f).isInstanceOf[DecreasesStar]).foreach(f => {
       val context = SimpleContext(f)
       val body = transform(f.body.get, context)

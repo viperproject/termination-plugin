@@ -1,4 +1,3 @@
-//:: IgnoreFile(/silicon/issue/247/)
 import <decreases/importAllDec.sil>
 
 function f(x: Int): Int
@@ -8,7 +7,6 @@ ensures decreases(x)
 }
 
 function g(x: Int): Int
-//:: UnexpectedOutput(postcondition.violated:assertion.false, /silicon/issue/247/)
 ensures result == 1
 ensures decreases(x)
 {
@@ -16,6 +14,7 @@ ensures decreases(x)
 }
 
 function h(x: Int): Int
+//:: UnexpectedOutput(postcondition.violated:assertion.false, /silicon/issue/247/)
 ensures result == 1
 ensures decreases(x)
 {

@@ -1,6 +1,7 @@
 package viper.termination.proofcode
 
 import viper.silver.ast._
+import viper.silver.verifier.AbstractError
 
 import scala.collection.mutable
 
@@ -10,10 +11,21 @@ import scala.collection.mutable
   */
 trait ProofProgram{
 
+  // original program
   val program: Program
 
+  // to report any errors
+  val reportError: AbstractError => Unit
+
+  // maps of all program features including the ones newly created/added
+  protected val domains: mutable.ListMap[String, Domain] = collection.mutable.ListMap[String, Domain](program.domains.map(d => d.name -> d): _*)
+  protected val fields: mutable.ListMap[String, Field] = collection.mutable.ListMap[String, Field](program.fields.map(f => f.name -> f): _*)
+  protected val functions: mutable.ListMap[String, Function] = collection.mutable.ListMap[String, Function](program.functions.map(f => f.name -> f): _*)
+  protected val predicates: mutable.ListMap[String, Predicate] = collection.mutable.ListMap[String, Predicate](program.predicates.map(f => f.name -> f): _*)
+  protected val methods: mutable.ListMap[String, Method] = collection.mutable.ListMap[String, Method](program.methods.map(f => f.name -> f): _*)
+
   // all names used in the program
-  val usedNames: collection.mutable.Set[String] = collection.mutable.HashSet((
+  private val usedNames: mutable.Set[String] = collection.mutable.HashSet((
     program.functions
       ++ program.methods
       ++ program.fields
@@ -22,38 +34,15 @@ trait ProofProgram{
       ++ program.domains.flatten(_.functions)
     ).map(_.name): _*)
 
-  val domains: mutable.ListMap[String, Domain] = collection.mutable.ListMap[String, Domain](program.domains.map(d => d.name -> d): _*)
-  val fields: mutable.ListMap[String, Field] = collection.mutable.ListMap[String, Field](program.fields.map(f => f.name -> f): _*)
-  val functions: mutable.ListMap[String, Function] = collection.mutable.ListMap[String, Function](program.functions.map(f => f.name -> f): _*)
-  val predicates: mutable.ListMap[String, Predicate] = collection.mutable.ListMap[String, Predicate](program.predicates.map(f => f.name -> f): _*)
-  val methods: mutable.ListMap[String, Method] = collection.mutable.ListMap[String, Method](program.methods.map(f => f.name -> f): _*)
-
-
-  def clear(): Unit = {
-    domains.clear()
-      domains ++= program.domains.map(d => d.name -> d)
-    fields.clear()
-    fields ++= program.fields.map(f => f.name -> f)
-    functions.clear
-    functions ++= program.functions.map(f => f.name -> f)
-    predicates.clear()
-    predicates ++= program.predicates.map(f => f.name -> f)
-    methods.clear()
-    methods ++= program.methods.map(f => f.name -> f)
-  }
 
   /**
-    * Creates a new program with the needed fields added to it
-    * @return a program
+    * Checks if a name already occurs in the program.
+    * @param name to be checked
+    * @return true iff the name is used in the program.
     */
-  def createCheckProgram(): Program = {
-    Program(domains.values.toSeq,
-      fields.values.toSeq,
-      functions.values.toSeq,
-      predicates.values.toSeq,
-      methods.values.toSeq)(program.pos, program.info, program.errT)
+  def containsName(name: String): Boolean = {
+    usedNames.contains(name)
   }
-
 
   /**
     * Creates a unique name for the program and adds it to the names already used in the program.
@@ -64,11 +53,36 @@ trait ProofProgram{
   def uniqueName(name: String): String = {
     var i = 1
     var newName = name
-    while(usedNames.contains(newName)){
+    while(containsName(newName)){
       newName = name + i
       i += 1
     }
     usedNames.add(newName)
     newName
+  }
+
+  private var newProgram: Option[Program] = None
+
+  /**
+    * @return the new program containing all the added checks.
+    */
+  final def getNewProgram: Program = {
+    if(newProgram.isEmpty){
+      newProgram = Some(createCheckProgram())
+    }
+    newProgram.get
+  }
+
+  /**
+    * Creates a new program with the additional features.
+    * Should only be called once.
+    * @return new program.
+    */
+  protected def createCheckProgram(): Program = {
+    Program(domains.values.toSeq,
+      fields.values.toSeq,
+      functions.values.toSeq,
+      predicates.values.toSeq,
+      methods.values.toSeq)(program.pos, program.info, program.errT)
   }
 }

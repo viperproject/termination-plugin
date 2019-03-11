@@ -1,4 +1,3 @@
-//:: IgnoreFile(/silicon/issue/300/)
 import <decreases/importAllDec.sil>
 
 //Example decreasing Int

@@ -1,15 +1,15 @@
 package viper.termination.proofcode
 
-import viper.silver.FastMessaging
-import viper.silver.ast.utility.Consistency
 import viper.silver.ast.utility.Statements.EmptyStmt
-import viper.silver.ast.{AccessPredicate, BinExp, CondExp, Domain, DomainFunc, DomainFuncApp, DomainType, Exp, FieldAccessPredicate, Fold, Function, If, Implies, Inhale, Int, LocalVar, LocalVarAssign, LocalVarDecl, MagicWand, PredicateAccess, PredicateAccessPredicate, Program, Seqn, SimpleInfo, Stmt, Type, TypeVar, UnExp, Unfold, Unfolding}
+import viper.silver.ast.{AccessPredicate, BinExp, CondExp, Domain, DomainFunc, DomainFuncApp, DomainType, Exp, FieldAccessPredicate, Fold, Function, If, Implies, Inhale, Int, LocalVar, LocalVarAssign, LocalVarDecl, MagicWand, Position, PredicateAccess, PredicateAccessPredicate, Program, Seqn, SimpleInfo, Stmt, Type, TypeVar, UnExp, Unfold, Unfolding}
+import viper.silver.verifier.ConsistencyError
 
 import scala.collection.immutable.ListMap
 
 /**
-  * Adds nested statements for the used predicates to the check code.
-  * Therefore it needs the following in the program:
+  * Adds nested statements for the used predicates to the check code
+  * and therefore also creates/manages variables representing the predicates.
+  * The following features are needed in the program:
   * "nested" domain function
   * "Loc" domain
   */
@@ -23,18 +23,11 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
 
   private val neededLocFunctions: collection.mutable.ListMap[String, DomainFunc] = collection.mutable.ListMap[String, DomainFunc]()
 
-  override def clear(): Unit = {
-    neededLocFunctions.clear()
-    neededLocalVars.clear()
-    super.clear()
-  }
-
   /**
     * Creates a new program with the needed fields added to it
-    *
     * @return a program
     */
-  override def createCheckProgram(): Program = {
+  override protected def createCheckProgram(): Program = {
 
     if(neededLocFunctions.nonEmpty){
       assert(locationDomain.isDefined)
@@ -73,13 +66,12 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
               //Generate nested-assumption
               transformPredicateBody(body.replace(ListMap(formalArgs.zip(pap.loc.args): _*)), pap, c)
             } else {
+              // at least one of Loc domain or nested function is not defined
               if (locationDomain.isEmpty) {
-                Consistency.messages ++= FastMessaging.message(
-                  pap, "missing location-domain")
+                reportLocNotDefined(pap.pos)
               }
               if (nestedFunc.isEmpty) {
-                Consistency.messages ++= FastMessaging.message(
-                  pap, "missing nested-relation")
+                reportNestedNotDefined(pap.pos)
               }
               EmptyStmt
             }
@@ -90,7 +82,6 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
 
       val unfoldBody = transform(unfBody, c)
       val fold = Fold(pap)()
-      // TODO: reassign the unfolded predicate for soundness?
       Seqn(Seq(unfold, nested, unfoldBody, fold), Nil)()
 
     case d => super.transform(d)
@@ -98,13 +89,14 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
 
   /**
     * Traverses a predicate body (once) and adds corresponding inhales of the 'nested'-Relation
-    * iff a predicate is inside of this body
+    * iff a predicate is inside of this body.
+    * locationDomain and nestedFun must be defined!
     *
     * @param body     the part of the predicate-body which should be analyzed
     * @param origPred the body of the original predicate which should be analyzed
     * @return statements with the generated inhales: (Inhale(nested(pred1, pred2)))
     */
-  def transformPredicateBody(body: Exp, origPred: PredicateAccessPredicate, context: FunctionContext): Stmt = {
+  private def transformPredicateBody(body: Exp, origPred: PredicateAccessPredicate, context: FunctionContext): Stmt = {
     body match {
       case ap: AccessPredicate => ap match {
         case FieldAccessPredicate(_, _) => EmptyStmt
@@ -170,10 +162,13 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
   /**
     * Generator of the predicate-variables, which represents the type 'predicate'.
     * The new variable is added to neededLocalVars, which then should be added to the method.
-    * @param p      predicate which defines the type of the variable
+    * locationDomain must be defined!
+    * @param p predicate which defines the type of the variable
     * @return a local variable with the correct type
     */
   def uniquePredLocVar(p: PredicateAccess, context: FunctionContext): LocalVar = {
+    assert(locationDomain.isDefined)
+
     val func = context.func
     val predVarName = p.predicateName + "_" + p.args.hashCode().toString.replaceAll("-", "_")
     if (!neededLocalVars.contains(func)){
@@ -217,5 +212,11 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
       }
   }
 
+  def reportNestedNotDefined(pos: Position): Unit = {
+    reportError(ConsistencyError("Nested function is needed but not defined.", pos))
+  }
 
+  def reportLocNotDefined(pos: Position): Unit = {
+    reportError(ConsistencyError("Loc domain is needed but not defined.", pos))
+  }
 }
