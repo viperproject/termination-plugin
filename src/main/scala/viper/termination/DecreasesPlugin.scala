@@ -31,31 +31,37 @@ trait DecreasesPlugin extends SilverPlugin {
     // replace all decreases (calls in postconditions of functions)
     // with decreasesN calls
     // and add DecreasesDomain with all needed decreasesN functions
+    def fixPDecreasesClauses(exp: PExp): PExp = exp match {
+      case call: PCall if call.opName.equals(DECREASES)=>
+        // replace call
+        val argsSize = call.args.length
+        val functionName = addDecreasesNFunction(argsSize)
+        // replace predicates
+        val newArgs = call.args.map {
+          case call: PCall if input.predicates.map(_.idndef.name).contains(call.idnuse.name) =>
+            // a predicate with the same name exists
+            val predicate = input.predicates.filter(_.idndef.name.equals(call.idnuse.name)).head
+            val formalArg = predicate.formalArgs
+            // use the same arguments to type check!
+            val function = addPredicateFunctions(call.idnuse.name, formalArg)
+            call.copy(func = PIdnUse(function)).setPos(call)
+          case default => default
+        }
+        call.copy(func = PIdnUse(functionName), args = newArgs).setPos(call)
+      case call: PCall if call.opName.equals(DECREASESSTAR) =>
+        // number of arguments (0) is checked by the typechecker.
+        call.copy(func = PIdnUse(getDecreasesStarFunction)).setPos(call)
+      case d => d
+    }
 
     val functions = input.functions.map(function => {
-      val posts = function.posts.map({
-          case call: PCall if call.opName.equals(DECREASES)=>
-            // replace call
-            val argsSize = call.args.length
-            val functionName = addDecreasesNFunction(argsSize)
-            // replace predicates
-            val newArgs = call.args.map {
-              case call: PCall if input.predicates.map(_.idndef.name).contains(call.idnuse.name) =>
-                // a predicate with the same name exists
-                val predicate = input.predicates.filter(_.idndef.name.equals(call.idnuse.name)).head
-                val formalArg = predicate.formalArgs
-                // use the same arguments to type check!
-                val function = addPredicateFunctions(call.idnuse.name, formalArg)
-                call.copy(func = PIdnUse(function)).setPos(call)
-              case default => default
-            }
-            call.copy(func = PIdnUse(functionName), args = newArgs).setPos(call)
-          case call: PCall if call.opName.equals(DECREASESSTAR) =>
-            // number of arguments (0) is checked by the typechecker.
-            call.copy(func = PIdnUse(getDecreasesStarFunction)).setPos(call)
-          case d => d
-      })
+      val posts = function.posts.map(fixPDecreasesClauses)
       function.copy(posts = posts).setPos(function)
+    })
+
+    val methods = input.methods.map(method => {
+      val posts = method.posts.map(fixPDecreasesClauses)
+      method.copy(posts = posts).setPos(method)
     })
 
     val domains = input.domains :+ {
@@ -181,6 +187,24 @@ trait DecreasesPlugin extends SilverPlugin {
     val decNFuncInverted = decreasesNFunctions.toMap.map(_.swap)
     val predFuncInverted = predicateFunctions.toMap.map(_.swap)
 
+    def createDecreasesExp(exp: Exp): Exp = exp match {
+      case c: Call if c.callee.equals(decStarFunc) =>
+        // replace all decreasesStar functions with DecreasesStar
+        DecreasesStar(c.pos, NodeTrafo(c))
+      case c: Call if decNFuncInverted.contains(c.callee) =>
+        // replace all decreasesN functions with DecreasesTuple
+        assert(c.args.size == decNFuncInverted(c.callee))
+        val newArgs = c.args map {
+          // replace all predicate functions with the PredicateAccess
+          case p: Call if predFuncInverted.contains(p.callee) =>
+            val mapResult = predFuncInverted(p.callee)
+            assert(p.args.size == mapResult._2.size)
+            PredicateAccess(p.args, mapResult._1)(p.pos, p.info, p.errT)
+          case default => default
+        }
+        DecreasesTuple(newArgs, c.pos, NodeTrafo(c))
+      case p => p
+    }
 
     ViperStrategy.Slim({
       case p: Program =>
@@ -188,27 +212,12 @@ trait DecreasesPlugin extends SilverPlugin {
         val domains = p.domains.filterNot(d => d.name.equals(helperDomain))
         p.copy(domains = domains)(p.pos, p.info, p.errT)
       case f: Function =>
-        val posts = f.posts map {
-          case c: Call if c.callee.equals(decStarFunc) =>
-            // replace all decreasesStar functions with DecreasesStar
-            DecreasesStar(c.pos, NodeTrafo(c))
-          case c: Call if decNFuncInverted.contains(c.callee) =>
-            // replace all decreasesN functions with DecreasesTuple
-            assert(c.args.size == decNFuncInverted(c.callee))
-            val newArgs = c.args map {
-              // replace all predicate functions with the PredicateAccess
-              case p: Call if predFuncInverted.contains(p.callee) =>
-                val mapResult = predFuncInverted(p.callee)
-                assert(p.args.size == mapResult._2.size)
-                PredicateAccess(p.args, mapResult._1)(p.pos, p.info, p.errT)
-              case default => default
-            }
-            DecreasesTuple(newArgs, c.pos, NodeTrafo(c))
-          case p => p
-        }
-        Function(name = f.name, formalArgs = f.formalArgs, typ = f.typ, pres = f.pres, posts = posts, body = f.body)(f.pos, f.info, f.errT)
+        val posts = f.posts map createDecreasesExp
+        f.copy(posts = posts)(f.pos, f.info, f.errT)
+      case m: Method =>
+        val posts = m.posts map createDecreasesExp
+        m.copy(posts = posts)(m.pos, m.info, m.errT)
     }).execute(input)
-
   }
 
   /** Called after methods are filtered but before the verification by the backend happens.
