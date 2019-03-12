@@ -7,7 +7,7 @@ lazy val silicon = project in file("silicon")
 // Silicon specific project settings
 lazy val term = (project in file("."))
   .dependsOn(silver % "compile->compile;test->test")
-  .dependsOn(silicon % "compile->compile;test->test")
+  .dependsOn(silicon % "test->test")
   .settings(
 
   name := "termination-plugin",
