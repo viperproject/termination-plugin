@@ -6,5 +6,6 @@ target/**
 .idea
 *.iml
 .DS_Store
+tmp/*
 silicon
 silver
