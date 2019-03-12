@@ -4,7 +4,7 @@ function f(x: Int): Int
 //:: ExpectedOutput(typechecker.error)
 ensures decreases(m(x))
 {
-  x > 7 ? f(f(x-x)) : 5
+  x == 0 ? 0 : f(x-1)
 }
 
 method m(x: Int) returns (res: Int)
@@ -12,4 +12,11 @@ method m(x: Int) returns (res: Int)
  ensures res == x
 {
     res := x
+}
+
+function g(x: Int): Int
+//:: ExpectedOutput(typechecker.error)
+ensures decreasesStar(x)
+{
+  x == 0 ? 0 : g(x-1)
 }

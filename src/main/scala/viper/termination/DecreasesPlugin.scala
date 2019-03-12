@@ -51,6 +51,7 @@ trait DecreasesPlugin extends SilverPlugin {
             }
             call.copy(func = PIdnUse(functionName), args = newArgs).setPos(call)
           case call: PCall if call.opName.equals(DECREASESSTAR) =>
+            // number of arguments (0) is checked by the typechecker.
             call.copy(func = PIdnUse(getDecreasesStarFunction)).setPos(call)
           case d => d
       })
