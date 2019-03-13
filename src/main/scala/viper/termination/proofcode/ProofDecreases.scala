@@ -1,6 +1,5 @@
 package viper.termination.proofcode
 
-import viper.silver.ast.utility.Functions
 import viper.silver.ast.utility.Statements.EmptyStmt
 import viper.silver.ast.{And, Assert, DomainFunc, DomainFuncApp, EqCmp, ErrTrafo, Exp, FalseLit, FuncApp, Function, LocalVar, Node, NodeTrafo, Old, Or, Position, PredicateAccess, ReTrafo, Stmt, Unfolding}
 import viper.silver.verifier.{AbstractVerificationError, ConsistencyError, ErrorReason, errors}
@@ -15,27 +14,7 @@ import scala.collection.immutable.ListMap
   *
   * It adds dummy function to the program if needed.
   */
-trait CheckDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredicate[C] {
-
-  // all defined decreases Expressions
-  val decreasesMap: Map[Function, DecreasesExp]
-
-  /**
-    * This function should be used to access all the DecreasesExp
-    * @param function for which the decreases exp is defined
-    * @return the defined DecreasesExp or a DecreasesTuple with the parameters as the arguments
-    */
-  def getDecreasesExp(function: Function): DecreasesExp = {
-    decreasesMap.getOrElse(function, {
-      DecreasesTuple(function.formalArgs.map(_.localVar), function.pos, NodeTrafo(function))
-    })
-  }
-
-  val heights: Map[Function, Int] = Functions.heights(program)
-  def compareHeights(f1: Function, f2: Function): Boolean= {
-    // guess heights are always positive
-    heights.getOrElse(f1, -1) == heights.getOrElse(f2, -2)
-  }
+trait ProofDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredicate[C] {
 
   val decreasingFunc: Option[DomainFunc] = program.findDomainFunctionOptionally("decreasing")
   val boundedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("bounded")
@@ -216,7 +195,7 @@ trait CheckDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredi
   }
 }
 
-trait FunctionContext extends Context{
+trait FunctionContext extends Context with ProofMethodContext {
   val func: Function
 }
 

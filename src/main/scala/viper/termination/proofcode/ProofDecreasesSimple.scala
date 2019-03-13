@@ -2,25 +2,43 @@
 package viper.termination.proofcode
 
 import viper.silver.ast._
+import viper.silver.ast.utility.Functions
 import viper.silver.verifier.errors.AssertFailed
 import viper.silver.verifier.{AbstractError, AbstractErrorReason, errors}
 import viper.silver.verifier.reasons.AssertionFalse
 
 import scala.collection.immutable.ListMap
 
-class CheckDecreasesSimple(val program: Program, val decreasesMap: Map[Function, DecreasesExp], val reportError: AbstractError => Unit) extends CheckDecreases[FunctionContext] {
+class CheckDecreasesSimple(val program: Program, val decreasesMap: Map[Function, DecreasesExp], val reportError: AbstractError => Unit) extends ProofDecreases[FunctionContext] {
+
+  private val heights: Map[Function, Int] = Functions.heights(program)
+  private def compareHeights(f1: Function, f2: Function): Boolean= {
+    // guess heights are always positive
+    heights.getOrElse(f1, -1) == heights.getOrElse(f2, -2)
+  }
+
+  /**
+    * This function should be used to access all the DecreasesExp
+    * @param function for which the decreases exp is defined
+    * @return the defined DecreasesExp or a DecreasesTuple with the parameters as the arguments
+    */
+  def getDecreasesExp(function: Function): DecreasesExp = {
+    decreasesMap.getOrElse(function, {
+      DecreasesTuple(function.formalArgs.map(_.localVar), function.pos, NodeTrafo(function))
+    })
+  }
 
   override protected def createCheckProgram(): Program = {
     program.functions.filterNot(f => f.body.isEmpty || getDecreasesExp(f).isInstanceOf[DecreasesStar]).foreach(f => {
-      val context = SimpleContext(f)
+      val methodName = uniqueName(f.name + "_termination_proof")
+      val context = SimpleContext(f, methodName)
       val body = transform(f.body.get, context)
-      val localVars = neededLocalVars.get(f) match {
+      val localVars = neededLocalVars.get(methodName) match {
         case Some(v) => v.values
         case None => Nil
       }
 
       val methodBody: Seqn = Seqn(Seq(body), localVars.toIndexedSeq)()
-      val methodName = uniqueName(f.name + "_termination_proof")
       val method = Method(methodName, f.formalArgs, Nil, f.pres, Nil, Option(methodBody))()
 
       methods(methodName) = method
@@ -29,7 +47,7 @@ class CheckDecreasesSimple(val program: Program, val decreasesMap: Map[Function,
     super.createCheckProgram()
   }
 
-  case class SimpleContext(func: Function) extends FunctionContext
+  case class SimpleContext(func: Function, methodName: String) extends FunctionContext
 
   /**
     * Adds case FuncApp

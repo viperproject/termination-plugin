@@ -13,13 +13,13 @@ import scala.collection.immutable.ListMap
   * "nested" domain function
   * "Loc" domain
   */
-trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFunctionBody[C] {
+trait UnfoldPredicate[C <: ProofMethodContext] extends ProofProgram with RewriteFunctionBody[C] {
 
   val nestedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("nested")
   val locationDomain: Option[Domain] =  program.domains.find(_.name == "Loc") // findDomainOptionally()?
 
   // local variables for methods. Have to be added to the created method
-  val neededLocalVars: collection.mutable.ListMap[Function, collection.mutable.ListMap[String, LocalVarDecl]] = collection.mutable.ListMap[Function, collection.mutable.ListMap[String, LocalVarDecl]]()
+  val neededLocalVars: collection.mutable.ListMap[String, collection.mutable.ListMap[String, LocalVarDecl]] = collection.mutable.ListMap[String, collection.mutable.ListMap[String, LocalVarDecl]]()
 
   private val neededLocFunctions: collection.mutable.ListMap[String, DomainFunc] = collection.mutable.ListMap[String, DomainFunc]()
 
@@ -96,7 +96,7 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
     * @param origPred the body of the original predicate which should be analyzed
     * @return statements with the generated inhales: (Inhale(nested(pred1, pred2)))
     */
-  private def transformPredicateBody(body: Exp, origPred: PredicateAccessPredicate, context: FunctionContext): Stmt = {
+  private def transformPredicateBody(body: Exp, origPred: PredicateAccessPredicate, context: ProofMethodContext): Stmt = {
     body match {
       case ap: AccessPredicate => ap match {
         case FieldAccessPredicate(_, _) => EmptyStmt
@@ -166,24 +166,24 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
     * @param p predicate which defines the type of the variable
     * @return a local variable with the correct type
     */
-  def uniquePredLocVar(p: PredicateAccess, context: FunctionContext): LocalVar = {
+  def uniquePredLocVar(p: PredicateAccess, context: ProofMethodContext): LocalVar = {
     assert(locationDomain.isDefined)
 
-    val func = context.func
+    val proofMethod = context.methodName
     val predVarName = p.predicateName + "_" + p.args.hashCode().toString.replaceAll("-", "_")
-    if (!neededLocalVars.contains(func)){
-      neededLocalVars(func) = collection.mutable.ListMap()
+    if (!neededLocalVars.contains(proofMethod)){
+      neededLocalVars(proofMethod) = collection.mutable.ListMap()
     }
-    if (neededLocalVars(func).contains(predVarName)) {
+    if (neededLocalVars(proofMethod).contains(predVarName)) {
       //Variable already exists
-      neededLocalVars(func)(predVarName).localVar
+      neededLocalVars(proofMethod)(predVarName).localVar
     } else {
       val info = SimpleInfo(Seq(p.predicateName + "_" + p.args.mkString(",")))
       val newLocalVar =
         LocalVar(predVarName)(DomainType(locationDomain.get,
           ListMap()),
           info = info)
-      neededLocalVars(func)(predVarName) = LocalVarDecl(newLocalVar.name, newLocalVar.typ)(newLocalVar.pos, info)
+      neededLocalVars(proofMethod)(predVarName) = LocalVarDecl(newLocalVar.name, newLocalVar.typ)(newLocalVar.pos, info)
       newLocalVar
     }
   }
@@ -219,4 +219,8 @@ trait UnfoldPredicate[C <: FunctionContext] extends ProofProgram with RewriteFun
   def reportLocNotDefined(pos: Position): Unit = {
     reportError(ConsistencyError("Loc domain is needed but not defined.", pos))
   }
+}
+
+trait ProofMethodContext extends Context {
+  val methodName: String
 }
