@@ -60,15 +60,28 @@ trait DecreasesPlugin extends SilverPlugin {
     })
 
     val methods = input.methods.map(method => {
-      val posts = method.posts.map(fixPDecreasesClauses)
-      method.copy(posts = posts).setPos(method)
+      if (method.body.isDefined) {
+        val posts = method.posts.map(fixPDecreasesClauses)
+
+        val body = Some(method.body.get.transform({
+          case w: PWhile =>
+            val invs = w.invs map fixPDecreasesClauses
+            w.copy(invs = invs)
+          case s => s
+        })(_ => true)
+        )
+
+        method.copy(posts = posts, body = body).setPos(method)
+      } else {
+        method
+      }
     })
 
     val domains = input.domains :+ {
       createHelperDomain(getHelperDomain, getDecreasesStarFunction,decreasesNFunctions.toMap, predicateFunctions.toMap)
     }
 
-    input.copy(functions = functions, domains = domains).setPos(input)
+    input.copy(functions = functions, methods = methods, domains = domains).setPos(input)
   }
 
   /**
@@ -217,6 +230,9 @@ trait DecreasesPlugin extends SilverPlugin {
       case m: Method =>
         val posts = m.posts map createDecreasesExp
         m.copy(posts = posts)(m.pos, m.info, m.errT)
+      case w: While =>
+        val invs = w.invs map createDecreasesExp
+        w.copy(invs = invs)(w.pos, w.info, w.errT)
     }).execute(input)
   }
 
@@ -228,6 +244,7 @@ trait DecreasesPlugin extends SilverPlugin {
     * @return Modified AST without DecreasesExp in postconditions of functions.
     */
   override def beforeVerify(input: Program): Program = {
+
     val errors = checkNoFunctionRecursesViaDecreasesClause(input) ++ checkNoMultipleDecreasesClause(input)
     if (errors.nonEmpty){
       for (e <- errors) {
@@ -240,9 +257,11 @@ trait DecreasesPlugin extends SilverPlugin {
     val extractedDecreasesExp = extractDecreasesExp(input)
 
     val newProgram: Program = extractedDecreasesExp._1
-    val decreasesMap = extractedDecreasesExp._2
+    val functionDecreasesMap = extractedDecreasesExp._2
+    val methodDecreasesMap = extractedDecreasesExp._3
+    val whileDecreasesMap = extractedDecreasesExp._4
 
-    transformToCheckProgram(newProgram, decreasesMap)
+    transformToCheckProgram(newProgram, functionDecreasesMap, methodDecreasesMap, whileDecreasesMap)
   }
 
 
@@ -264,11 +283,15 @@ trait DecreasesPlugin extends SilverPlugin {
 
   /**
     * Creates a Program containing all the wanted termination checks (defined by a concrete plugin)
+    *
     * @param input verifiable program (i.e. no DecreasesExp in postconditions)
-    * @param decreasesMap all decreases exp (defined by the user)
+    * @param functionDecreasesMap all decreases exp (defined by the user)
     * @return a program with the additional termination checks (including the input program)
     */
-  def transformToCheckProgram(input: Program, decreasesMap: Map[Function, DecreasesExp]): Program
+  def transformToCheckProgram(input: Program,
+                              functionDecreasesMap: Map[Function, DecreasesExp] = Map.empty[Function, DecreasesExp],
+                              methodDecreasesMap: Map[Method, DecreasesExp] = Map.empty[Method, DecreasesExp],
+                              whileDecreasesMap: Map[While, DecreasesExp] = Map.empty[While, DecreasesExp]): Program
 
   /**
     * Checks if a function is defined recursively via its decrease clause (DecreasesExp in postconditions),
@@ -314,8 +337,10 @@ trait DecreasesPlugin extends SilverPlugin {
     * @param program with at most one(!) DecreasesExp in functions postcondition.
     * @return verifiable program (i.e. without DecreasesExp in functions postconditions)
     */
-  private def extractDecreasesExp(program: Program): (Program, Map[Function, DecreasesExp]) = {
-    val decreaseMap = scala.collection.mutable.Map[Function, DecreasesExp]()
+  private def extractDecreasesExp(program: Program): (Program, Map[Function, DecreasesExp], Map[Method, DecreasesExp], Map[While, DecreasesExp]) = {
+    val functionDecreaseMap = scala.collection.mutable.Map[Function, DecreasesExp]()
+    val methodDecreaseMap = scala.collection.mutable.Map[Method, DecreasesExp]()
+    val whileDecreaseMap = scala.collection.mutable.Map[While, DecreasesExp]()
 
     val result: Program = ViperStrategy.Slim({
       case f: Function =>
@@ -329,14 +354,50 @@ trait DecreasesPlugin extends SilverPlugin {
             Function(name = f.name, formalArgs = f.formalArgs, typ = f.typ, pres = f.pres, posts = posts, body = f.body)(f.pos, f.info, f.errT)
 
           if (decreases.nonEmpty) {
-            decreaseMap += (newFunction -> decreases.head.asInstanceOf[DecreasesExp])
+            functionDecreaseMap += (newFunction -> decreases.head.asInstanceOf[DecreasesExp])
           }
           newFunction
         } else {
           // none decreases clause
           f
         }
+      case m: Method =>
+        val partition = m.posts.partition(p => p.isInstanceOf[DecreasesExp])
+        val decreases = partition._1
+        val posts = partition._2
+
+        if (decreases.nonEmpty) {
+          // one DecreasesExp found
+          val newMethod =
+            m.copy(posts = posts)(m.pos, m.info, m.errT)
+
+          if (decreases.nonEmpty) {
+            methodDecreaseMap += (newMethod -> decreases.head.asInstanceOf[DecreasesExp])
+          }
+          newMethod
+        } else {
+          // none decreases clause
+          m
+        }
+      case w: While =>
+        val partition = w.invs.partition(p => p.isInstanceOf[DecreasesExp])
+        val decreases = partition._1
+        val invs = partition._2
+
+        if (decreases.nonEmpty) {
+          // one DecreasesExp found
+          val newWhile =
+            w.copy(invs = invs)(w.pos, w.info, w.errT)
+
+          if (decreases.nonEmpty) {
+            whileDecreaseMap += (newWhile -> decreases.head.asInstanceOf[DecreasesExp])
+          }
+          newWhile
+        } else {
+          // none decreases clause
+          w
+        }
     }).execute(program)
-    (result, decreaseMap.toMap)
+    (result, functionDecreaseMap.toMap, methodDecreaseMap.toMap, whileDecreaseMap.toMap)
   }
 }
