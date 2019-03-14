@@ -38,13 +38,12 @@ trait DecreasesPlugin extends SilverPlugin {
         val functionName = addDecreasesNFunction(argsSize)
         // replace predicates
         val newArgs = call.args.map {
-          case call: PCall if input.predicates.map(_.idndef.name).contains(call.idnuse.name) =>
+          case predicateCall: PCall if input.predicates.map(_.idndef.name).contains(predicateCall.idnuse.name) =>
             // a predicate with the same name exists
-            val predicate = input.predicates.filter(_.idndef.name.equals(call.idnuse.name)).head
-            val formalArg = predicate.formalArgs
-            // use the same arguments to type check!
-            val function = addPredicateFunctions(call.idnuse.name, formalArg)
-            call.copy(func = PIdnUse(function)).setPos(call)
+            fixPredicateAccessPredicate(predicateCall)
+          case pap: PAccPred if input.predicates.map(_.idndef.name).contains(pap.loc.idnuse.name) =>
+            // a predicate with the same name exists
+            fixPredicateAccessPredicate(pap.loc, pap.perm)
           case default => default
         }
         call.copy(func = PIdnUse(functionName), args = newArgs).setPos(call)
@@ -52,6 +51,23 @@ trait DecreasesPlugin extends SilverPlugin {
         // number of arguments (0) is checked by the typechecker.
         call.copy(func = PIdnUse(getDecreasesStarFunction)).setPos(call)
       case d => d
+    }
+
+    /**
+      * Replaces predicate accesses with function calls.
+      * The predicate must be in the program!
+      * The arguments of the call are the arguments of the predicate plus the permission expression as last argument.
+      * @param pap
+      * @param perm
+      * @return
+      */
+    def fixPredicateAccessPredicate(pap: POpApp, perm: PExp = PFullPerm()): PCall = {
+      // a predicate with the same name exists
+      val predicate = input.predicates.find(_.idndef.name.equals(pap.opName)).get
+      val formalArg = predicate.formalArgs
+      // use the same arguments plus the permission at the end!
+      val function = addPredicateFunctions(pap.opName, formalArg)
+      PCall(PIdnUse(function), pap.args :+ perm).setPos(pap)
     }
 
     val functions = input.functions.map(function => {
@@ -114,7 +130,7 @@ trait DecreasesPlugin extends SilverPlugin {
 
   /**
     * All needed functions representing a predicate in the decrease clause
-    * ((predicateName, argumentNumber) -> functionName)
+    * ((predicateName, arguments :+ perm) -> functionName)
     * Has to be invertible
     */
   private val predicateFunctions = collection.mutable.Map[(String, Seq[PFormalArgDecl]), String]()
@@ -208,11 +224,12 @@ trait DecreasesPlugin extends SilverPlugin {
         // replace all decreasesN functions with DecreasesTuple
         assert(c.args.size == decNFuncInverted(c.callee))
         val newArgs = c.args map {
-          // replace all predicate functions with the PredicateAccess
+          // replace all predicate functions with the PredicateAccessPredicate
           case p: Call if predFuncInverted.contains(p.callee) =>
             val mapResult = predFuncInverted(p.callee)
             assert(p.args.size == mapResult._2.size)
-            PredicateAccess(p.args, mapResult._1)(p.pos, p.info, p.errT)
+            val pa = PredicateAccess(p.args.init, mapResult._1)(p.pos, p.info, p.errT)
+            PredicateAccessPredicate(pa, perm = p.args.last)(p.pos, p.info, p.errT)
           case default => default
         }
         DecreasesTuple(newArgs, c.pos, NodeTrafo(c))
