@@ -35,6 +35,7 @@ case class DecreasesTuple(extensionSubnodes: Seq[Exp] = Nil, pos: Position = NoP
   * @param errT Error transformation.
   */
 case class DecreasesStar(pos: Position = NoPosition, errT: ErrorTrafo = NoTrafos) extends DecreasesExp{
+
   override def extensionIsPure: Boolean = true
 
   override def extensionSubnodes: Seq[Node] = Nil
