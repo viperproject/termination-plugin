@@ -5,7 +5,7 @@ import viper.silver.ast.{Program, While}
 import viper.termination.proofcode.TerminationFunctionPath
 
 // run --plugin viper.silver.plugin.DecreasesPath [file]
-class DecreasesPath extends DecreasesPlugin {
+class DecreasesFunctionPath extends DecreasesPlugin {
 
   override def transformToCheckProgram(input: Program, functionDecreasesMap: Map[ast.Function, DecreasesExp], methodDecreasesMap: Map[String, DecreasesExp], whileDecreasesMap: Map[While, DecreasesExp]): Program = {
     val termCheck = new TerminationFunctionPath(input, functionDecreasesMap, reportError)

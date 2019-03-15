@@ -21,11 +21,11 @@ class TerminationFunction(override val program: Program,
     program.functions.filterNot(f => f.body.isEmpty || getFunctionDecreasesExp(f).isInstanceOf[DecreasesStar]).foreach(f => {
       val methodName = uniqueName(f.name + "_termination_proof")
       val context = FContext(f, methodName)
-      val toTransform = (f.body.get, context)
-      val body = transformFuncBody(toTransform)
+
+      val body = transformFuncBody(f.body.get, context)
 
       // get all predicate init values which are used.
-      val newVarPred = initPredLocVar.getOrElse(methodName, Map.empty)
+      val newVarPred = getMethodsInitPredLocVar(methodName)
       val newVarPredAss: Seq[Stmt] = newVarPred.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
 
       val methodBody: Seqn = Seqn(newVarPredAss :+ body, newVarPred.values.toIndexedSeq)()

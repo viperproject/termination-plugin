@@ -141,10 +141,12 @@ trait LocManager extends ProgramManager {
     LocalVarAssign(assLocation, assValue)(pred.pos)
   }
 
-  val initPredLocVar: scala.collection.mutable.Map[String, scala.collection.mutable.Map[PredicateAccessPredicate, LocalVarDecl]] = scala.collection.mutable.Map()
+  private val initPredLocVar: scala.collection.mutable.Map[String, scala.collection.mutable.Map[PredicateAccessPredicate, LocalVarDecl]] = scala.collection.mutable.Map()
 
   def getInitPredLocVar(method: String, p: PredicateAccessPredicate): LocalVarDecl =
     initPredLocVar.getOrElseUpdate(method, scala.collection.mutable.Map()).getOrElseUpdate(p, uniquePredLocVar(p.loc))
+
+  def getMethodsInitPredLocVar(method: String): Map[PredicateAccessPredicate, LocalVarDecl] = initPredLocVar.getOrElse(method, Map.empty).toMap
 
   /**
     * Generator of the predicate-variables, which represents the type 'predicate'.

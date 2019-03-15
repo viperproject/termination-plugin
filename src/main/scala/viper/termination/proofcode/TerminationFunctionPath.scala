@@ -18,14 +18,13 @@ class TerminationFunctionPath(override val program: Program,
     * @return new program.
     */
   override protected def createCheckProgram(): Program = {
-
     program.functions.filterNot(f => f.body.isEmpty || getFunctionDecreasesExp(f).isInstanceOf[DecreasesStar]).foreach(f => {
       val methodName = uniqueName(f.name + "_termination_proof")
       val context = FContext(f, methodName, Nil, Set.empty + f.name)
       val body = transformFuncBody(f.body.get, context)
 
       // get all predicate init values which are used.
-      val newVarPred = initPredLocVar.getOrElse(methodName, Map.empty)
+      val newVarPred = getMethodsInitPredLocVar(methodName)
       val newVarPredAss: Seq[Stmt] = newVarPred.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
 
       val methodBody: Seqn = Seqn(newVarPredAss :+ body, newVarPred.values.toIndexedSeq)()

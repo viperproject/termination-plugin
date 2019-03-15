@@ -20,18 +20,27 @@ class TerminationProof(override val program: Program,
   override protected def createCheckProgram(): Program = {
     program.methods.filterNot(m => m.body.isEmpty || getMethodDecreasesExp(m.name).isInstanceOf[DecreasesStar]).foreach(m => {
       val context = MContext(m.name)
+
       val body: Stmt = methodStrategy(context).execute(m.body.get)
-      methods(m.name) = m.copy(body = Option(Seqn(Seq(body), Nil)()))(m.pos, m.info, m.errT)
+
+      // get all predicate init values which are used.
+      val newVarPred = getMethodsInitPredLocVar(m.name)
+      val newVarPredAss: Seq[Stmt] = newVarPred.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
+
+      val methodBody: Seqn = Seqn(newVarPredAss :+ body, newVarPred.values.toIndexedSeq)()
+      val method = m.copy(body = Option(methodBody))(m.pos, m.info, m.errT)
+
+      methods(m.name) = method
     })
 
     program.functions.filterNot(f => f.body.isEmpty || getFunctionDecreasesExp(f).isInstanceOf[DecreasesStar]).foreach(f => {
       val methodName = uniqueName(f.name + "_termination_proof")
       val context = FContext(f, methodName)
-      val toTransform = (f.body.get, context)
-      val body = transformFuncBody(toTransform)
+
+      val body = transformFuncBody(f.body.get, context)
 
       // get all predicate init values which are used.
-      val newVarPred = initPredLocVar.getOrElse(methodName, Map.empty)
+      val newVarPred = getMethodsInitPredLocVar(methodName)
       val newVarPredAss: Seq[Stmt] = newVarPred.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
 
       val methodBody: Seqn = Seqn(newVarPredAss :+ body, newVarPred.values.toIndexedSeq)()
