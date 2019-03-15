@@ -1,0 +1,27 @@
+import <decreases/pred_decreases.sil>
+
+field next: Ref
+
+predicate list(this: Ref) {
+  acc(this.next) &&
+  (this.next != null ==> list(this.next))
+}
+
+method append(this: Ref)
+  requires list(this)
+  ensures  list(this)
+  ensures decreases(list(this))
+{
+  unfold list(this)
+    if (this.next == null) {
+      var n: Ref
+
+      n := new(next)
+      n.next := null
+      this.next := n
+      fold list(n)
+    }else{
+    append(this.next)
+    }
+  fold list(this)
+}

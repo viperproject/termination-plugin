@@ -1,4 +1,4 @@
-package viper.termination.proofcode
+package viper.termination.proofcode.util
 
 import viper.silver.ast._
 import viper.silver.verifier.AbstractError
@@ -9,7 +9,7 @@ import scala.collection.mutable
   * An interface which offers to add additional code to a program
   * without causing name conflicts.
   */
-trait ProofProgram{
+trait ProgramManager{
 
   // original program
   val program: Program

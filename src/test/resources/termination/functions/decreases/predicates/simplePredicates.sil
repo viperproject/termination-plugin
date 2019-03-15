@@ -24,20 +24,3 @@ predicate q(s :Seq[Int])
 {
 	(|s| > 6 && true) ? true : q(s[1..])
 }
-
-field next:Ref
-field value:Int
-
-function f3(r: Ref): Bool
-requires acc(r.next)
-requires acc(r.value)
-requires t(r, r.value)
-ensures decreases(t(r, r.value))
-{
-  unfolding t(r, r.value) in r.value>10 ? true : f3(r.next)
-}
-
-predicate t(r:Ref, i:Int)
-{
-	acc(r.value) && (i > 10 ==> (acc(r.next) && t(r.next,i-1)))
-}

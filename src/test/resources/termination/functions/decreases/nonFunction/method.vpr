@@ -1,0 +1,19 @@
+import <decreases/int_decreases.sil>
+
+method m(x: Int)
+ requires x >= 0
+ ensures decreases(x)
+{
+    if (x == 0) {
+        // nothing
+    }else {
+      m(x-1)
+    }
+
+    var y: Int := x
+    while(y >= 0)
+        invariant decreases(y)
+    {
+        y := y - 1
+    }
+}

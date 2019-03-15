@@ -1,4 +1,4 @@
-package viper.termination.proofcode
+package viper.termination
 
 import viper.silver.ast._
 import viper.silver.ast.pretty.FastPrettyPrinter.{ContOps, char, parens, space, ssep, text, toParenDoc}
@@ -35,6 +35,7 @@ case class DecreasesTuple(extensionSubnodes: Seq[Exp] = Nil, pos: Position = NoP
   * @param errT Error transformation.
   */
 case class DecreasesStar(pos: Position = NoPosition, errT: ErrorTrafo = NoTrafos) extends DecreasesExp{
+
   override def extensionIsPure: Boolean = true
 
   override def extensionSubnodes: Seq[Node] = Nil

@@ -1,14 +1,14 @@
-package viper.termination.proofcode
+package viper.termination.proofcode.util
 
-import viper.silver.ast.utility.Statements.EmptyStmt
 import viper.silver.ast._
+import viper.silver.ast.utility.Statements.EmptyStmt
 
 /**
   * A basic interface which helps to write a function body (Exp) into a method body (Stmt).
   * Some basic transformations are already implemented.
   * @tparam C: the context in which an expression is transformed.
   */
-trait RewriteFunctionBody[C <: Context] {
+trait FunctionTransformer extends LocManager {
 
   /**
     * Transforms an expression (e.g. function body) into a statement.
@@ -19,24 +19,22 @@ trait RewriteFunctionBody[C <: Context] {
     *
     * @return a statement representing the expression
     */
-  def transform: PartialFunction[(Exp, C), Stmt] = {
-    case (callee: FuncApp, _) =>
-      EmptyStmt
+  def transformFuncBody: PartialFunction[(Exp, Context), Stmt] = {
     case (CondExp(cond, thn, els), c) =>
-      val condStmt = transform(cond, c)
-      val thnStmt = transform(thn, c)
-      val elsStmt = transform(els, c)
+      val condStmt = transformFuncBody(cond, c)
+      val thnStmt = transformFuncBody(thn, c)
+      val elsStmt = transformFuncBody(els, c)
       val ifStmt = If(transformExp(cond, c), Seqn(Seq(thnStmt), Nil)(), Seqn(Seq(elsStmt), Nil)())()
       Seqn(Seq(condStmt, ifStmt), Nil)()
     case (Unfolding(acc, unfBody), c) =>
-      val permCheck = transform(acc.perm, c)
-      val unfold = Unfold(acc)()
-      val unfoldBody = transform(unfBody, c)
+      val permCheck = transformFuncBody(acc.perm, c)
+      val unfold = transformUnfold(acc)
+      val unfoldBody = transformFuncBody(unfBody, c)
       val fold = Fold(acc)()
-      Seqn(Seq(unfold, unfoldBody, fold), Nil)()
+      Seqn(Seq(permCheck, unfold, unfoldBody, fold), Nil)()
     case (b: BinExp, c) =>
-      val left = transform(b.left, c)
-      val right = transform(b.right, c)
+      val left = transformFuncBody(b.left, c)
+      val right = transformFuncBody(b.right, c)
       // Short circuit evaluation
       b match {
         case _: Or =>
@@ -56,38 +54,38 @@ trait RewriteFunctionBody[C <: Context] {
       }
     case (sq: SeqExp, c) => sq match {
       case ExplicitSeq(elems) =>
-        Seqn(elems.map(transform(_, c)), Nil)(sq.pos)
+        Seqn(elems.map(transformFuncBody(_, c)), Nil)(sq.pos)
       case RangeSeq(low, high) =>
-        Seqn(Seq(transform(low, c),
-          transform(high, c)), Nil)(sq.pos)
+        Seqn(Seq(transformFuncBody(low, c),
+          transformFuncBody(high, c)), Nil)(sq.pos)
       case SeqAppend(left, right) =>
-        Seqn(Seq(transform(left, c),
-          transform(right, c)), Nil)(sq.pos)
+        Seqn(Seq(transformFuncBody(left, c),
+          transformFuncBody(right, c)), Nil)(sq.pos)
       case SeqIndex(s, idx) =>
-        Seqn(Seq(transform(s, c),
-          transform(idx, c)), Nil)(sq.pos)
+        Seqn(Seq(transformFuncBody(s, c),
+          transformFuncBody(idx, c)), Nil)(sq.pos)
       case SeqTake(s, n) =>
-        Seqn(Seq(transform(s, c),
-          transform(n, c)), Nil)(sq.pos)
+        Seqn(Seq(transformFuncBody(s, c),
+          transformFuncBody(n, c)), Nil)(sq.pos)
       case SeqDrop(s, n) =>
-        Seqn(Seq(transform(s, c),
-          transform(n, c)), Nil)(sq.pos)
+        Seqn(Seq(transformFuncBody(s, c),
+          transformFuncBody(n, c)), Nil)(sq.pos)
       case SeqContains(elem, s) =>
-        Seqn(Seq(transform(elem, c),
-          transform(s, c)), Nil)(sq.pos)
+        Seqn(Seq(transformFuncBody(elem, c),
+          transformFuncBody(s, c)), Nil)(sq.pos)
       case SeqUpdate(s, idx, elem) =>
-        Seqn(Seq(transform(s, c),
-          transform(idx, c),
-          transform(elem, c)), Nil)(sq.pos)
+        Seqn(Seq(transformFuncBody(s, c),
+          transformFuncBody(idx, c),
+          transformFuncBody(elem, c)), Nil)(sq.pos)
       case SeqLength(s) =>
-        Seqn(Seq(transform(s, c)), Nil)(sq.pos)
+        Seqn(Seq(transformFuncBody(s, c)), Nil)(sq.pos)
       case _: Exp => EmptyStmt
     }
     case (st: ExplicitSet, c) =>
-      Seqn(st.elems.map(transform(_, c)), Nil)(st.pos)
+      Seqn(st.elems.map(transformFuncBody(_, c)), Nil)(st.pos)
     case (mst: ExplicitMultiset, c) =>
-      Seqn(mst.elems.map(transform(_, c)), Nil)(mst.pos)
-    case (u: UnExp, c) => transform(u.exp, c)
+      Seqn(mst.elems.map(transformFuncBody(_, c)), Nil)(mst.pos)
+    case (u: UnExp, c) => transformFuncBody(u.exp, c)
     case _ => EmptyStmt
   }
 
@@ -97,7 +95,7 @@ trait RewriteFunctionBody[C <: Context] {
     * @param context in which the transformation happens
     * @return the transformed expression
     */
-  def transformExp(exp: Exp, context: C): Exp = {
+  def transformExp(exp: Exp, context: Context): Exp = {
     exp
   }
 }
