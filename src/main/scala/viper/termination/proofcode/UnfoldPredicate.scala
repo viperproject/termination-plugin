@@ -1,7 +1,7 @@
 package viper.termination.proofcode
 
 import viper.silver.ast.utility.Statements.EmptyStmt
-import viper.silver.ast.{AccessPredicate, BinExp, CondExp, Domain, DomainFunc, DomainFuncApp, DomainType, Exp, FieldAccessPredicate, Fold, Function, If, Implies, Inhale, Int, LocalVar, LocalVarAssign, LocalVarDecl, MagicWand, Position, PredicateAccess, PredicateAccessPredicate, Program, Seqn, SimpleInfo, Stmt, Type, TypeVar, UnExp, Unfold, Unfolding}
+import viper.silver.ast.{AccessPredicate, BinExp, CondExp, CurrentPerm, Domain, DomainFunc, DomainFuncApp, DomainType, Exp, FieldAccessPredicate, Fold, FuncApp, Function, If, Implies, Inhale, Int, LocalVar, LocalVarAssign, LocalVarDecl, MagicWand, NoInfo, NodeTrafo, Perm, PermExp, PermMul, Position, Predicate, PredicateAccess, PredicateAccessPredicate, Seqn, SimpleInfo, Stmt, Type, TypeVar, UnExp, Unfold, Unfolding}
 import viper.silver.verifier.ConsistencyError
 
 import scala.collection.immutable.ListMap
@@ -13,34 +13,12 @@ import scala.collection.immutable.ListMap
   * "nested" domain function
   * "Loc" domain
   */
-trait UnfoldPredicate[C <: ProofMethodContext] extends ProofProgram with RewriteFunctionBody[C] {
+trait UnfoldPredicate[C <: Context] extends ProofProgram with RewriteFunctionBody[C] {
 
   val nestedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("nested")
   val locationDomain: Option[Domain] =  program.domains.find(_.name == "Loc") // findDomainOptionally()?
 
-  // local variables for methods. Have to be added to the created method
-  val neededLocalVars: collection.mutable.ListMap[String, collection.mutable.ListMap[String, LocalVarDecl]] = collection.mutable.ListMap[String, collection.mutable.ListMap[String, LocalVarDecl]]()
-
-  private val neededLocFunctions: collection.mutable.ListMap[String, DomainFunc] = collection.mutable.ListMap[String, DomainFunc]()
-
-  /**
-    * Creates a new program with the needed fields added to it
-    * @return a program
-    */
-  override protected def createCheckProgram(): Program = {
-
-    if(neededLocFunctions.nonEmpty){
-      assert(locationDomain.isDefined)
-      val newLocDom = Domain(locationDomain.get.name,
-        neededLocFunctions.values.toSeq,
-        locationDomain.get.axioms,
-        locationDomain.get.typVars)(locationDomain.get.pos, locationDomain.get.info, locationDomain.get.errT)
-
-      domains(newLocDom.name) = newLocDom
-    }
-
-    super.createCheckProgram()
-  }
+  private val createdLocFunctions: collection.mutable.ListMap[String, Function] = collection.mutable.ListMap[String, Function]()
 
 
   /**
@@ -55,6 +33,30 @@ trait UnfoldPredicate[C <: ProofMethodContext] extends ProofProgram with Rewrite
     case (Unfolding(pap, unfBody), c) =>
       // unfolding with nested inhale
       val permCheck = transform(pap.perm, c)
+
+      val unfold = createUnfold(pap)
+
+      val unfoldBody = transform(unfBody, c)
+      val fold = Fold(pap)()
+
+      Seqn(Seq(unfold, unfoldBody, fold), Nil)()
+
+    case d => super.transform(d)
+  }
+
+  /**
+    * Creates an Unfold with the given predicate access predicate and the nested relations.
+    *
+    * @param pap
+    * @return
+    */
+  private def createUnfold(pap: PredicateAccessPredicate): Stmt = {
+
+    if (locationDomain.isDefined && nestedFunc.isDefined) {
+      // assign variable to "predicate" before unfold
+      val varP = uniquePredLocVar(pap.loc)
+      val assignP = generatePredicateAssign(pap.loc, pap.perm, varP.localVar)
+
       val unfold = Unfold(pap)()
 
       val nested: Stmt = {
@@ -62,9 +64,9 @@ trait UnfoldPredicate[C <: ProofMethodContext] extends ProofProgram with Rewrite
         pred.body match {
           case Some(body) =>
             if (locationDomain.isDefined && nestedFunc.isDefined) {
-              val formalArgs = pred.formalArgs map (_.localVar)
+              val formalArgs = ListMap(pred.formalArgs.map(_.localVar).zip(pap.loc.args): _*)
               //Generate nested-assumption
-              transformPredicateBody(body.replace(ListMap(formalArgs.zip(pap.loc.args): _*)), pap, c)
+              transformPredicateBody(body.replace(formalArgs), varP, pap.perm)
             } else {
               // at least one of Loc domain or nested function is not defined
               if (locationDomain.isEmpty) {
@@ -75,16 +77,23 @@ trait UnfoldPredicate[C <: ProofMethodContext] extends ProofProgram with Rewrite
               }
               EmptyStmt
             }
-          //Predicate has no body
-          case None => EmptyStmt
+          case None => EmptyStmt //Predicate has no body
         }
       }
+      Seqn(Seq(assignP, unfold, nested), Seq(varP))()
 
-      val unfoldBody = transform(unfBody, c)
-      val fold = Fold(pap)()
-      Seqn(Seq(unfold, nested, unfoldBody, fold), Nil)()
+    } else {
+      // at least one of Loc domain or nested function is not defined
+      if (locationDomain.isEmpty) {
+        reportLocNotDefined(pap.pos)
+      }
+      if (nestedFunc.isEmpty) {
+        reportNestedNotDefined(pap.pos)
+      }
+      EmptyStmt
+    }
 
-    case d => super.transform(d)
+
   }
 
   /**
@@ -93,10 +102,10 @@ trait UnfoldPredicate[C <: ProofMethodContext] extends ProofProgram with Rewrite
     * locationDomain and nestedFun must be defined!
     *
     * @param body     the part of the predicate-body which should be analyzed
-    * @param origPred the body of the original predicate which should be analyzed
+    * @param unfoldedPredVar the body of the original predicate which should be analyzed
     * @return statements with the generated inhales: (Inhale(nested(pred1, pred2)))
     */
-  private def transformPredicateBody(body: Exp, origPred: PredicateAccessPredicate, context: ProofMethodContext): Stmt = {
+  private def transformPredicateBody(body: Exp, unfoldedPredVar: LocalVarDecl, unfoldPermission: Exp): Stmt = {
     body match {
       case ap: AccessPredicate => ap match {
         case FieldAccessPredicate(_, _) => EmptyStmt
@@ -105,12 +114,13 @@ trait UnfoldPredicate[C <: ProofMethodContext] extends ProofProgram with Rewrite
           assert(nestedFunc.isDefined)
 
           //local variables
-          val varOfCallerPred: LocalVar = uniquePredLocVar(origPred.loc, context)
-          val varOfCalleePred: LocalVar = uniquePredLocVar(calledPred.loc, context)
+          val varOfCallerPred: LocalVarDecl = unfoldedPredVar
+          val varOfCalleePred: LocalVarDecl = uniquePredLocVar(calledPred.loc)
 
-          //assign
-          val assign1 = generateAssign(origPred, varOfCallerPred)
-          val assign2 = generateAssign(calledPred, varOfCalleePred)
+          //assignment
+          // perm = calledPred.perm * calleePred.perm
+          val perm = PermMul(unfoldPermission, calledPred.perm)()
+          val assign = generatePredicateAssign(calledPred.loc, perm, varOfCalleePred.localVar)
 
           //inhale nested-relation
           val params: Seq[TypeVar] = program.findDomain(nestedFunc.get.domainName).typVars
@@ -119,24 +129,24 @@ trait UnfoldPredicate[C <: ProofMethodContext] extends ProofProgram with Rewrite
 
           val mapNested: ListMap[TypeVar, Type] = ListMap(params.zip(types):_*)
           val inhale = Inhale(DomainFuncApp(nestedFunc.get,
-            Seq(varOfCalleePred, varOfCallerPred),
+            Seq(varOfCalleePred.localVar, varOfCallerPred.localVar),
             mapNested)(calledPred.pos))(calledPred.pos)
-          Seqn(Seq(assign1, assign2, inhale), Nil)(calledPred.pos)
+          Seqn(Seq(assign, inhale), Seq(varOfCalleePred))(calledPred.pos)
         case mw: MagicWand =>
           sys.error(s"Unexpectedly found resource access node $mw")
       }
       case c: CondExp =>
-        val thn = transformPredicateBody(c.thn, origPred, context)
-        val els = transformPredicateBody(c.els, origPred, context)
+        val thn = transformPredicateBody(c.thn, unfoldedPredVar, unfoldPermission)
+        val els = transformPredicateBody(c.els, unfoldedPredVar, unfoldPermission)
         If(c.cond, Seqn(Seq(thn), Nil)(c.pos), Seqn(Seq(els), Nil)(c.pos))(c.pos)
       case i: Implies =>
-        val thn = transformPredicateBody(i.right, origPred, context)
+        val thn = transformPredicateBody(i.right, unfoldedPredVar, unfoldPermission)
         If(i.left, Seqn(Seq(thn), Nil)(i.pos), EmptyStmt)(i.pos)
       case b: BinExp =>
-        val left = transformPredicateBody(b.left, origPred, context)
-        val right = transformPredicateBody(b.right, origPred, context)
+        val left = transformPredicateBody(b.left, unfoldedPredVar, unfoldPermission)
+        val right = transformPredicateBody(b.right, unfoldedPredVar, unfoldPermission)
         Seqn(Seq(left, right), Nil)(b.pos)
-      case u: UnExp => transformPredicateBody(u.exp, origPred, context)
+      case u: UnExp => transformPredicateBody(u.exp, unfoldedPredVar, unfoldPermission)
       case _ => EmptyStmt
     }
   }
@@ -148,16 +158,20 @@ trait UnfoldPredicate[C <: ProofMethodContext] extends ProofProgram with Rewrite
     *
     * @param pred        the predicate which defines the predicate-Domain and predicate-domainFunc
     * @param assLocation the variable, which should be assigned
-    * @param argMap      an optional mapping used for replacing the arguments of the predicate
+    * @param permission  an optional permission value. (if None is given the permission from pred is taken)
     * @return an assignment of the given variable to the representation of a predicate with the corresponding arguments
     */
-  def generateAssign(pred: PredicateAccessPredicate, assLocation: LocalVar, argMap: ListMap[Exp, Exp] = ListMap.empty)
+  def generatePredicateAssign(pred: PredicateAccess, permission: Exp, assLocation: LocalVar)
   : LocalVarAssign = {
-    val domainFunc = addPredicateDomainFunction(pred)
-    val typVarMap: ListMap[TypeVar, Type] = ListMap()
-    val assValue = DomainFuncApp(domainFunc, pred.loc.args.map(_.replace(argMap)), typVarMap)(pred.pos)
+    val locFunc = getLocFunction(pred.loc(program))
+    val assValue = FuncApp(locFunc, pred.args :+ permission)()
     LocalVarAssign(assLocation, assValue)(pred.pos)
   }
+
+  val initPredLocVar: scala.collection.mutable.Map[String, scala.collection.mutable.Map[PredicateAccessPredicate, LocalVarDecl]] = scala.collection.mutable.Map()
+
+  def getInitPredLocVar(method: String, p: PredicateAccessPredicate): LocalVarDecl =
+    initPredLocVar.getOrElseUpdate(method, scala.collection.mutable.Map()).getOrElseUpdate(p, uniquePredLocVar(p.loc))
 
   /**
     * Generator of the predicate-variables, which represents the type 'predicate'.
@@ -166,50 +180,70 @@ trait UnfoldPredicate[C <: ProofMethodContext] extends ProofProgram with Rewrite
     * @param p predicate which defines the type of the variable
     * @return a local variable with the correct type
     */
-  def uniquePredLocVar(p: PredicateAccess, context: ProofMethodContext): LocalVar = {
+  def uniquePredLocVar(p: PredicateAccess): LocalVarDecl = {
     assert(locationDomain.isDefined)
-
-    val proofMethod = context.methodName
-    val predVarName = p.predicateName + "_" + p.args.hashCode().toString.replaceAll("-", "_")
-    if (!neededLocalVars.contains(proofMethod)){
-      neededLocalVars(proofMethod) = collection.mutable.ListMap()
-    }
-    if (neededLocalVars(proofMethod).contains(predVarName)) {
-      //Variable already exists
-      neededLocalVars(proofMethod)(predVarName).localVar
-    } else {
-      val info = SimpleInfo(Seq(p.predicateName + "_" + p.args.mkString(",")))
-      val newLocalVar =
-        LocalVar(predVarName)(DomainType(locationDomain.get,
-          ListMap()),
-          info = info)
-      neededLocalVars(proofMethod)(predVarName) = LocalVarDecl(newLocalVar.name, newLocalVar.typ)(newLocalVar.pos, info)
-      newLocalVar
-    }
+    val predName = p.predicateName + "_" + p.args.hashCode().toString.replaceAll("-", "_")
+    val predVarName = uniqueLocalVar(predName)
+    val info = SimpleInfo(Seq(p.predicateName + "_" + p.args.mkString(",")))
+    val newLocalVar =
+      LocalVarDecl(predVarName, DomainType(locationDomain.get,
+        ListMap()))(info = info)
+    newLocalVar
   }
 
   /**
-    * Creates a domain function to create the representation of the predicate
+    * Creates a function to create the representation of the predicate
     * @param pap predicate
-    * @return domain function
+    * @return function
     */
-  private def addPredicateDomainFunction(pap: PredicateAccessPredicate): DomainFunc = {
-      if (neededLocFunctions.contains(pap.loc.predicateName)) {
-        neededLocFunctions(pap.loc.predicateName)
-      } else {
-        val uniquePredFuncName =
-          uniqueName("loc_" + pap.loc.args.map(_.typ).mkString("_").replaceAll("\\[", "").replaceAll("\\]", ""))
-        val pred = program.findPredicate(pap.loc.predicateName)
-        val newLocFunc =
-          DomainFunc(uniquePredFuncName,
-            pred.formalArgs,
-            DomainType(locationDomain.get,
-              ListMap())
-          )(locationDomain.get.pos, locationDomain.get.info, locationDomain.get.name, locationDomain.get.errT)
+  private def getLocFunction(pap: Predicate): Function = {
+    assert(locationDomain.isDefined)
 
-        neededLocFunctions(pap.loc.predicateName) = newLocFunc
-        newLocFunc
-      }
+    if (createdLocFunctions.contains(pap.name)) {
+      createdLocFunctions(pap.name)
+    } else {
+      val uniquePredFuncName =
+        uniqueName("loc_" + pap.name + "_" + pap.formalArgs.map(_.typ).mkString("_").replaceAll("\\[", "").replaceAll("\\]", ""))
+      val pred = program.findPredicate(pap.name)
+      val permVar =
+        LocalVarDecl(uniqueNameInSet("p", pred.formalArgs.map(_.name).toSet), Perm)(pap.pos, NoInfo, NodeTrafo(pap))
+      val newLocFunc =
+        Function(uniquePredFuncName,
+          pred.formalArgs :+ permVar,
+          DomainType(locationDomain.get, ListMap()),
+          Seq(PredicateAccessPredicate(PredicateAccess(pred.formalArgs.map(_.localVar), pred.name)(), permVar.localVar)(pap.pos, pap.info, pap.errT)), // or permition wildcard
+          Seq(),
+          None
+        )(locationDomain.get.pos, locationDomain.get.info)
+
+      createdLocFunctions(pap.name) = newLocFunc
+      functions(uniquePredFuncName) = newLocFunc
+      newLocFunc
+    }
+  }
+
+  private val usedPredVariables: collection.mutable.Set[String] = collection.mutable.Set[String]()
+
+  private def uniqueLocalVar(name: String): String = {
+    var i = 0
+    var newName = name
+    while(usedPredVariables.contains(newName)){
+      newName = name + i
+      i += 1
+    }
+    usedPredVariables.add(newName)
+    newName
+  }
+
+
+  private def uniqueNameInSet(name: String, used: Set[String]): String = {
+    var i = 0
+    var newName = name
+    while(used.contains(newName)){
+      newName = name + i
+      i += 1
+    }
+    newName
   }
 
   def reportNestedNotDefined(pos: Position): Unit = {

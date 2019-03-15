@@ -33,12 +33,12 @@ class CheckDecreasesSimple(val program: Program, val decreasesMap: Map[Function,
       val methodName = uniqueName(f.name + "_termination_proof")
       val context = SimpleContext(f, methodName)
       val body = transform(f.body.get, context)
-      val localVars = neededLocalVars.get(methodName) match {
-        case Some(v) => v.values
-        case None => Nil
-      }
 
-      val methodBody: Seqn = Seqn(Seq(body), localVars.toIndexedSeq)()
+      // get all predicate init values which are used.
+      val newVarPred = initPredLocVar.getOrElse(methodName, Map.empty)
+      val newVarPredAss: Seq[Stmt] = newVarPred.map(v => generatePredicateAssign(v._1.loc, v._1.perm, v._2.localVar)).toSeq
+
+      val methodBody: Seqn = Seqn(newVarPredAss :+ body, newVarPred.values.toIndexedSeq)()
       val method = Method(methodName, f.formalArgs, Nil, f.pres, Nil, Option(methodBody))()
 
       methods(methodName) = method
@@ -115,6 +115,9 @@ class CheckDecreasesSimple(val program: Program, val decreasesMap: Map[Function,
   }
 }
 
+trait FunctionContext extends Context with ProofMethodContext {
+  val func: Function
+}
 
 case class TerminationNoDecrease(offendingNode: DecreasesTuple, decOrigin: Seq[Exp], decDest: Seq[Exp]) extends AbstractErrorReason {
   val id = "termination.no.decrease"

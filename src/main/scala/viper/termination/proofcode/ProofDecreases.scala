@@ -1,7 +1,7 @@
 package viper.termination.proofcode
 
 import viper.silver.ast.utility.Statements.EmptyStmt
-import viper.silver.ast.{And, Assert, DomainFunc, DomainFuncApp, EqCmp, ErrTrafo, Exp, FalseLit, FuncApp, Function, LocalVar, Node, NodeTrafo, Old, Or, Position, PredicateAccess, ReTrafo, Stmt, Unfolding}
+import viper.silver.ast.{And, Assert, DomainFunc, DomainFuncApp, EqCmp, ErrTrafo, Exp, FalseLit, FuncApp, LocalVar, LocalVarDecl, Node, Or, Position, PredicateAccessPredicate, ReTrafo, Seqn, Stmt}
 import viper.silver.verifier.{AbstractVerificationError, ConsistencyError, ErrorReason, errors}
 
 import scala.collection.immutable.ListMap
@@ -14,50 +14,10 @@ import scala.collection.immutable.ListMap
   *
   * It adds dummy function to the program if needed.
   */
-trait ProofDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredicate[C] {
+trait ProofDecreases[C <: ProofMethodContext] extends ProofProgram with UnfoldPredicate[C] {
 
   val decreasingFunc: Option[DomainFunc] = program.findDomainFunctionOptionally("decreasing")
   val boundedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("bounded")
-
-  private val dummyFunctions: scala.collection.mutable.Map[String, Function] = scala.collection.mutable.Map[String, Function]()
-
-  /**
-    * Replaces all function calls in an expression with calls to dummy functions
-    * if they have the same height (possibly mutual recursive).
-    * @param exp to be transformed
-    * @param context of the transformation
-    * @return
-    */
-  override def transformExp(exp: Exp, context: C): Exp = {
-    /*
-    val newExp = StrategyBuilder.Slim[Node]({
-      case fa: FuncApp if compareHeights(context.func, functions(fa.funcname)) =>
-        addDummyFunction(fa)
-    }, Traverse.BottomUp)
-      .execute(exp)
-      .asInstanceOf[Exp]
-    */
-    super.transformExp(exp, context)
-  }
-
-  /** Generator of the dummy-Functions
-    *
-    * @param fa function for which the corresponding structure should be generated
-    * @return the needed dummy-function
-    */
-  private def addDummyFunction(fa: FuncApp): FuncApp = {
-    if (dummyFunctions.contains(fa.funcname)) {
-      FuncApp(dummyFunctions(fa.funcname), fa.args)(fa.pos)
-    } else {
-      val uniqueFuncName = uniqueName(fa.funcname + "_withoutBody")
-      val func = program.findFunction(fa.funcname)
-      val newFunc = Function(uniqueFuncName, func.formalArgs, func.typ, Nil, Nil, None)(func.pos)
-
-      dummyFunctions(fa.funcname) = newFunc
-      functions(uniqueFuncName) = newFunc
-      FuncApp(newFunc, fa.args)(fa.pos)
-    }
-  }
 
   /**
     * Creates a termination check.
@@ -71,7 +31,7 @@ trait ProofDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredi
     * @return termination check as a Assert Stmt (if decreasing and bounded are defined, otherwise EmptyStmt)
     */
   def createTerminationCheck(biggerDec: DecreasesExp, smallerDec: DecreasesExp, argMap: Map[LocalVar, Node],
-                             errTrafo: ErrTrafo, reasonTrafoFactory: ReasonTrafoFactory, context: FunctionContext): Stmt = {
+                             errTrafo: ErrTrafo, reasonTrafoFactory: ReasonTrafoFactory, context: C): Stmt = {
     (biggerDec, smallerDec) match {
       case (DecreasesTuple(_,_,_), DecreasesStar(_,_)) =>
         val reTStar = reasonTrafoFactory.createStar(context)
@@ -87,23 +47,27 @@ trait ProofDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredi
           val reTDec = reasonTrafoFactory.createNotDecrease(bExp, sExp, context)
 
           val checkableBiggerExp = bExp.map({
-            case pa: PredicateAccess =>
+            case pa: PredicateAccessPredicate =>
               if (locationDomain.isDefined) {
-                val varOfCalleePred = uniquePredLocVar(pa, context)
-                varOfCalleePred
+                // use the init predicate variable
+                val varOfCalleePred = getInitPredLocVar(context.methodName, pa)
+                varOfCalleePred.localVar
               } else {
                 reportLocNotDefined(biggerDec.pos)
                 pa
               }
-            case unfold: Unfolding => Old(unfold)(unfold.pos)
+            //case unfold: Unfolding => Old(unfold)(unfold.pos)
             case default => default
           })
+
+          var newVarPred = scala.collection.mutable.Map[PredicateAccessPredicate, LocalVarDecl]()
 
           val checkableSmallerExp = sExp.map({
-            case pa: PredicateAccess =>
+            case pa: PredicateAccessPredicate =>
               if (locationDomain.isDefined) {
-                val varOfCalleePred = uniquePredLocVar(pa, context)
-                varOfCalleePred
+                val varOfCalleePred = uniquePredLocVar(pa.loc)
+                newVarPred(pa) = varOfCalleePred
+                varOfCalleePred.localVar
               } else {
                 reportLocNotDefined(biggerDec.pos)
                 pa
@@ -111,9 +75,12 @@ trait ProofDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredi
             case default => default
           })
 
-          val check = createTerminationCheckExp(checkableBiggerExp, checkableSmallerExp, reTDec, reTBound)
+          val newVarPredAss: Seq[Stmt] = newVarPred.map(v => generatePredicateAssign(v._1.loc, v._1.perm, v._2.localVar)).toSeq
 
-          Assert(check)(errT = errTrafo)
+          val check = createTerminationCheckExp(checkableBiggerExp, checkableSmallerExp, reTDec, reTBound)
+          val assert = Assert(check)(errT = errTrafo)
+
+          Seqn(newVarPredAss :+ assert, newVarPred.values.toSeq)()
         }else{
           // at least of the needed functions is not defined
           if (decreasingFunc.isEmpty){
@@ -140,7 +107,7 @@ trait ProofDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredi
     * @param smallerExp [s,..] same size as biggerExp
     * @return expression or false if expression is empty
     */
-  def createTerminationCheckExp(biggerExp: Seq[Exp], smallerExp: Seq[Exp], decrReTrafo: ReTrafo, boundReTrafo: ReTrafo): Exp = {
+  private def createTerminationCheckExp(biggerExp: Seq[Exp], smallerExp: Seq[Exp], decrReTrafo: ReTrafo, boundReTrafo: ReTrafo): Exp = {
     assert(biggerExp.size == smallerExp.size)
     assert(decreasingFunc.isDefined)
     assert(boundedFunc.isDefined)
@@ -193,10 +160,6 @@ trait ProofDecreases[C <: FunctionContext] extends ProofProgram with UnfoldPredi
   def reportBoundedNotDefined(pos: Position): Unit = {
     reportError(ConsistencyError("Bounded function is needed but not defined.", pos))
   }
-}
-
-trait FunctionContext extends Context with ProofMethodContext {
-  val func: Function
 }
 
 /**

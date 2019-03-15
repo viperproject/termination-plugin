@@ -20,8 +20,6 @@ trait RewriteFunctionBody[C <: Context] {
     * @return a statement representing the expression
     */
   def transform: PartialFunction[(Exp, C), Stmt] = {
-    case (callee: FuncApp, _) =>
-      EmptyStmt
     case (CondExp(cond, thn, els), c) =>
       val condStmt = transform(cond, c)
       val thnStmt = transform(thn, c)
