@@ -62,10 +62,10 @@ trait DecreasesPlugin extends SilverPlugin {
       * @return
       */
     def fixPredicateAccessPredicate(pap: POpApp, perm: PExp = PFullPerm()): PCall = {
-      // a predicate with the same name exists
+      // a predicate with the same name must exists
       val predicate = input.predicates.find(_.idndef.name.equals(pap.opName)).get
       val formalArg = predicate.formalArgs
-      // use the same arguments plus the permission at the end!
+      // use the same arguments!
       val function = addPredicateFunctions(pap.opName, formalArg)
       PCall(PIdnUse(function), pap.args :+ perm).setPos(pap)
     }
@@ -94,7 +94,7 @@ trait DecreasesPlugin extends SilverPlugin {
     })
 
     val domains = input.domains :+ {
-      createHelperDomain(getHelperDomain, getDecreasesStarFunction,decreasesNFunctions.toMap, predicateFunctions.toMap)
+      createHelperDomain(getHelperDomain, getDecreasesStarFunction, decreasesNFunctions.toMap, predicateFunctions.toMap)
     }
 
     input.copy(functions = functions, methods = methods, domains = domains).setPos(input)
@@ -139,7 +139,7 @@ trait DecreasesPlugin extends SilverPlugin {
     * Adds a new predicate representing function's name to the predicateFunction map
     * if none exists for this predicate.
     * @param predicateName identifying the predicate
-    * @param args number of arguments of the predicate
+    * @param args arguments of the predicate
     * @return name of the function
     */
   private  def addPredicateFunctions(predicateName: String, args: Seq[PFormalArgDecl]): String = {
@@ -148,6 +148,16 @@ trait DecreasesPlugin extends SilverPlugin {
       predicateFunctions((predicateName, args)) = functionName
     }
     predicateFunctions((predicateName, args))
+  }
+
+  private def getUniqueName(name: String, used: Set[String]): String = {
+    var i = 0
+    var newName = name
+    while(used.contains(newName)){
+      newName = name + i
+      i += 1
+    }
+    newName
   }
 
   private def getHelperDomain: String = {
@@ -189,7 +199,10 @@ trait DecreasesPlugin extends SilverPlugin {
     // all needed predicate functions
     val predicateFunctions: Seq[PDomainFunction] = predicates.map {
       case ((_, args), function) =>
-        PDomainFunction(PIdnDef(function), args, PPrimitiv(TypeHelper.Bool.name), unique = false)(domainIdUse)
+        // add permission as last argument
+        val perm = getUniqueName("permission", args.map(_.idndef.name).toSet)
+        val permArgDecl = PFormalArgDecl(PIdnDef(perm), TypeHelper.Perm)
+        PDomainFunction(PIdnDef(function), args :+ permArgDecl, PPrimitiv(TypeHelper.Bool.name), unique = false)(domainIdUse)
     }.toSeq
 
     PDomain(domainIdDef, typeVars, decreasesFunctions ++ predicateFunctions :+ decreasesStarFunction , Seq())
@@ -227,7 +240,7 @@ trait DecreasesPlugin extends SilverPlugin {
           // replace all predicate functions with the PredicateAccessPredicate
           case p: Call if predFuncInverted.contains(p.callee) =>
             val mapResult = predFuncInverted(p.callee)
-            assert(p.args.size == mapResult._2.size)
+            assert(p.args.size - 1 == mapResult._2.size) // + permission argument
             val pa = PredicateAccess(p.args.init, mapResult._1)(p.pos, p.info, p.errT)
             PredicateAccessPredicate(pa, perm = p.args.last)(p.pos, p.info, p.errT)
           case default => default
@@ -242,12 +255,15 @@ trait DecreasesPlugin extends SilverPlugin {
         val domains = p.domains.filterNot(d => d.name.equals(helperDomain))
         p.copy(domains = domains)(p.pos, p.info, p.errT)
       case f: Function =>
+        // replace decreasesN calls in postconditions with DecreasesExp
         val posts = f.posts map createDecreasesExp
         f.copy(posts = posts)(f.pos, f.info, f.errT)
       case m: Method =>
+        // replace decreasesN calls in postconditions with DecreasesExp
         val posts = m.posts map createDecreasesExp
         m.copy(posts = posts)(m.pos, m.info, m.errT)
       case w: While =>
+        // replace decreasesN calls in postconditions with DecreasesExp
         val invs = w.invs map createDecreasesExp
         w.copy(invs = invs)(w.pos, w.info, w.errT)
     }).execute(input)
@@ -261,7 +277,6 @@ trait DecreasesPlugin extends SilverPlugin {
     * @return Modified AST without DecreasesExp in postconditions of functions.
     */
   override def beforeVerify(input: Program): Program = {
-
     val errors = checkNoFunctionRecursesViaDecreasesClause(input) ++ checkNoMultipleDecreasesClause(input)
     if (errors.nonEmpty){
       for (e <- errors) {
