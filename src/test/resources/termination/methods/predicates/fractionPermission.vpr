@@ -1,0 +1,22 @@
+import <decreases/pred_decreases.sil>
+
+field next: Ref
+
+predicate list(this: Ref) {
+  acc(this.next) &&
+  (this.next != null ==> list(this.next))
+}
+
+// function does terminate!
+method traverse(this: Ref)
+    requires acc(list(this), 1/2)
+    ensures acc(list(this), 1/2)
+    ensures decreases(list(this))
+{
+    unfold acc(list(this), 1/2)
+        if (this.next != null)
+        {
+            traverse(this.next)
+        }
+    fold acc(list(this), 1/2)
+}
