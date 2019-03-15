@@ -1,0 +1,15 @@
+import <decreases/int_decreases.sil>
+
+method m(x: Int) returns (res:Int)
+    requires x >= 0
+    ensures res == x
+    ensures decreases(x)
+{
+    if (x==0) {
+        res := 0
+    }else{
+        var r: Int
+        r := m(x-1)
+        res := 1 + r
+    }
+}

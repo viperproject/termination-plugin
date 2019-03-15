@@ -1,8 +1,10 @@
-package viper.termination.proofcode
+package viper.termination.proofcode.util
 
 import viper.silver.ast.utility.Statements.EmptyStmt
-import viper.silver.ast.{And, Assert, DomainFunc, DomainFuncApp, EqCmp, ErrTrafo, Exp, FalseLit, FuncApp, LocalVar, LocalVarDecl, Node, Or, Position, PredicateAccessPredicate, ReTrafo, Seqn, Stmt}
+import viper.silver.ast._
+import viper.silver.verifier.reasons.ErrorNode
 import viper.silver.verifier.{AbstractVerificationError, ConsistencyError, ErrorReason, errors}
+import viper.termination.{DecreasesExp, DecreasesStar, DecreasesTuple}
 
 import scala.collection.immutable.ListMap
 
@@ -14,7 +16,7 @@ import scala.collection.immutable.ListMap
   *
   * It adds dummy function to the program if needed.
   */
-trait ProofDecreases[C <: ProofMethodContext] extends ProofProgram with UnfoldPredicate[C] {
+trait DecreasesCheck extends ProgramManager with LocManager {
 
   val decreasingFunc: Option[DomainFunc] = program.findDomainFunctionOptionally("decreasing")
   val boundedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("bounded")
@@ -31,7 +33,7 @@ trait ProofDecreases[C <: ProofMethodContext] extends ProofProgram with UnfoldPr
     * @return termination check as a Assert Stmt (if decreasing and bounded are defined, otherwise EmptyStmt)
     */
   def createTerminationCheck(biggerDec: DecreasesExp, smallerDec: DecreasesExp, argMap: Map[LocalVar, Node],
-                             errTrafo: ErrTrafo, reasonTrafoFactory: ReasonTrafoFactory, context: C): Stmt = {
+                             errTrafo: ErrTrafo, reasonTrafoFactory: ReasonTrafoFactory, context: ProofMethodContext): Stmt = {
     (biggerDec, smallerDec) match {
       case (DecreasesTuple(_,_,_), DecreasesStar(_,_)) =>
         val reTStar = reasonTrafoFactory.createStar(context)
@@ -75,7 +77,7 @@ trait ProofDecreases[C <: ProofMethodContext] extends ProofProgram with UnfoldPr
             case default => default
           })
 
-          val newVarPredAss: Seq[Stmt] = newVarPred.map(v => generatePredicateAssign(v._1.loc, v._1.perm, v._2.localVar)).toSeq
+          val newVarPredAss: Seq[Stmt] = newVarPred.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
 
           val check = createTerminationCheckExp(checkableBiggerExp, checkableSmallerExp, reTDec, reTBound)
           val assert = Assert(check)(errT = errTrafo)
@@ -124,14 +126,15 @@ trait ProofDecreases[C <: ProofMethodContext] extends ProofProgram with UnfoldPr
         assert(biggerExp.nonEmpty)
         assert(biggerExp.size == smallerExp.size)
         val bigger = biggerExp.head
+        val biggerOld = Old(biggerExp.head)(bigger.pos, bigger.info, bigger.errT)
         val smaller = smallerExp.head
         val dec = DomainFuncApp(decreasingFunc.get,
-          Seq(smaller, bigger),
+          Seq(smaller, biggerOld),
           ListMap(argTypeVarsDecr.head -> smaller.typ,
             argTypeVarsDecr.last -> bigger.typ))(errT = decrReTrafo)
 
         val bound = DomainFuncApp(boundedFunc.get,
-          Seq(bigger),
+          Seq(biggerOld),
           ListMap(argTypeVarsDecr.head -> bigger.typ,
             argTypeVarsDecr.last -> bigger.typ
           ))(errT = boundReTrafo)
@@ -165,7 +168,7 @@ trait ProofDecreases[C <: ProofMethodContext] extends ProofProgram with UnfoldPr
 /**
   * Error for all termination related failed assertions.
   */
-case class TerminationFailed(offendingNode: FuncApp, reason: ErrorReason, override val cached: Boolean = false) extends AbstractVerificationError {
+case class TerminationFailed(offendingNode: ErrorNode, reason: ErrorReason, override val cached: Boolean = false) extends AbstractVerificationError {
   val id = "termination.failed"
   val text = s"Function might not terminate."
 

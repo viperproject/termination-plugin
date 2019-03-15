@@ -1,7 +1,7 @@
-package viper.termination.proofcode
+package viper.termination.proofcode.util
 
 import viper.silver.ast.utility.Statements.EmptyStmt
-import viper.silver.ast.{AccessPredicate, BinExp, CondExp, CurrentPerm, Domain, DomainFunc, DomainFuncApp, DomainType, Exp, FieldAccessPredicate, Fold, FuncApp, Function, If, Implies, Inhale, Int, LocalVar, LocalVarAssign, LocalVarDecl, MagicWand, NoInfo, NodeTrafo, Perm, PermExp, PermMul, Position, Predicate, PredicateAccess, PredicateAccessPredicate, Seqn, SimpleInfo, Stmt, Type, TypeVar, UnExp, Unfold, Unfolding}
+import viper.silver.ast.{AccessPredicate, BinExp, CondExp, Domain, DomainFunc, DomainFuncApp, DomainType, Exp, FieldAccessPredicate, FuncApp, Function, If, Implies, Inhale, Int, LocalVar, LocalVarAssign, LocalVarDecl, MagicWand, Position, Predicate, PredicateAccess, PredicateAccessPredicate, Seqn, SimpleInfo, Stmt, Type, TypeVar, UnExp, Unfold, WildcardPerm}
 import viper.silver.verifier.ConsistencyError
 
 import scala.collection.immutable.ListMap
@@ -13,36 +13,12 @@ import scala.collection.immutable.ListMap
   * "nested" domain function
   * "Loc" domain
   */
-trait UnfoldPredicate[C <: Context] extends ProofProgram with RewriteFunctionBody[C] {
+trait LocManager extends ProgramManager {
 
   val nestedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("nested")
   val locationDomain: Option[Domain] =  program.domains.find(_.name == "Loc") // findDomainOptionally()?
 
   private val createdLocFunctions: collection.mutable.ListMap[String, Function] = collection.mutable.ListMap[String, Function]()
-
-
-  /**
-    * Transforms an expression (e.g. function body) into a statement.
-    * Parts of the expressions which stay expressions (e.g. the condition in a if clause)
-    * are added in front as statements.
-    * by the transfromExp.
-    *
-    * @return a statement representing the expression
-    */
-  override def transform: PartialFunction[(Exp, C), Stmt] = {
-    case (Unfolding(pap, unfBody), c) =>
-      // unfolding with nested inhale
-      val permCheck = transform(pap.perm, c)
-
-      val unfold = createUnfold(pap)
-
-      val unfoldBody = transform(unfBody, c)
-      val fold = Fold(pap)()
-
-      Seqn(Seq(unfold, unfoldBody, fold), Nil)()
-
-    case d => super.transform(d)
-  }
 
   /**
     * Creates an Unfold with the given predicate access predicate and the nested relations.
@@ -50,12 +26,12 @@ trait UnfoldPredicate[C <: Context] extends ProofProgram with RewriteFunctionBod
     * @param pap
     * @return
     */
-  private def createUnfold(pap: PredicateAccessPredicate): Stmt = {
+  def transformUnfold(pap: PredicateAccessPredicate): Stmt = {
 
     if (locationDomain.isDefined && nestedFunc.isDefined) {
       // assign variable to "predicate" before unfold
       val varP = uniquePredLocVar(pap.loc)
-      val assignP = generatePredicateAssign(pap.loc, pap.perm, varP.localVar)
+      val assignP = generatePredicateAssign(varP.localVar, pap.loc)
 
       val unfold = Unfold(pap)()
 
@@ -118,9 +94,7 @@ trait UnfoldPredicate[C <: Context] extends ProofProgram with RewriteFunctionBod
           val varOfCalleePred: LocalVarDecl = uniquePredLocVar(calledPred.loc)
 
           //assignment
-          // perm = calledPred.perm * calleePred.perm
-          val perm = PermMul(unfoldPermission, calledPred.perm)()
-          val assign = generatePredicateAssign(calledPred.loc, perm, varOfCalleePred.localVar)
+          val assign = generatePredicateAssign(varOfCalleePred.localVar, calledPred.loc)
 
           //inhale nested-relation
           val params: Seq[TypeVar] = program.findDomain(nestedFunc.get.domainName).typVars
@@ -158,13 +132,12 @@ trait UnfoldPredicate[C <: Context] extends ProofProgram with RewriteFunctionBod
     *
     * @param pred        the predicate which defines the predicate-Domain and predicate-domainFunc
     * @param assLocation the variable, which should be assigned
-    * @param permission  an optional permission value. (if None is given the permission from pred is taken)
     * @return an assignment of the given variable to the representation of a predicate with the corresponding arguments
     */
-  def generatePredicateAssign(pred: PredicateAccess, permission: Exp, assLocation: LocalVar)
+  def generatePredicateAssign(assLocation: LocalVar, pred: PredicateAccess)
   : LocalVarAssign = {
     val locFunc = getLocFunction(pred.loc(program))
-    val assValue = FuncApp(locFunc, pred.args :+ permission)()
+    val assValue = FuncApp(locFunc, pred.args)()
     LocalVarAssign(assLocation, assValue)(pred.pos)
   }
 
@@ -203,15 +176,13 @@ trait UnfoldPredicate[C <: Context] extends ProofProgram with RewriteFunctionBod
       createdLocFunctions(pap.name)
     } else {
       val uniquePredFuncName =
-        uniqueName("loc_" + pap.name + "_" + pap.formalArgs.map(_.typ).mkString("_").replaceAll("\\[", "").replaceAll("\\]", ""))
+        uniqueName("loc_" + pap.name)
       val pred = program.findPredicate(pap.name)
-      val permVar =
-        LocalVarDecl(uniqueNameInSet("p", pred.formalArgs.map(_.name).toSet), Perm)(pap.pos, NoInfo, NodeTrafo(pap))
       val newLocFunc =
         Function(uniquePredFuncName,
-          pred.formalArgs :+ permVar,
+          pred.formalArgs,
           DomainType(locationDomain.get, ListMap()),
-          Seq(PredicateAccessPredicate(PredicateAccess(pred.formalArgs.map(_.localVar), pred.name)(), permVar.localVar)(pap.pos, pap.info, pap.errT)), // or permition wildcard
+          Seq(PredicateAccessPredicate(PredicateAccess(pred.formalArgs.map(_.localVar), pred.name)(), WildcardPerm()())(pap.pos, pap.info, pap.errT)),
           Seq(),
           None
         )(locationDomain.get.pos, locationDomain.get.info)
@@ -224,6 +195,7 @@ trait UnfoldPredicate[C <: Context] extends ProofProgram with RewriteFunctionBod
 
   private val usedPredVariables: collection.mutable.Set[String] = collection.mutable.Set[String]()
 
+  //TODO: assumed that pred variable names are alone in the proof method.
   private def uniqueLocalVar(name: String): String = {
     var i = 0
     var newName = name
@@ -232,17 +204,6 @@ trait UnfoldPredicate[C <: Context] extends ProofProgram with RewriteFunctionBod
       i += 1
     }
     usedPredVariables.add(newName)
-    newName
-  }
-
-
-  private def uniqueNameInSet(name: String, used: Set[String]): String = {
-    var i = 0
-    var newName = name
-    while(used.contains(newName)){
-      newName = name + i
-      i += 1
-    }
     newName
   }
 

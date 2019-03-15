@@ -1,4 +1,4 @@
-package viper.termination.proofcode
+package viper.termination
 
 import viper.silver.ast._
 import viper.silver.ast.pretty.FastPrettyPrinter.{ContOps, char, parens, space, ssep, text, toParenDoc}

@@ -5,7 +5,6 @@ import viper.silver.ast._
 import viper.silver.ast.utility.{Functions, ViperStrategy}
 import viper.silver.parser._
 import viper.silver.plugin.SilverPlugin
-import viper.termination.proofcode._
 import viper.silver.verifier.errors.AssertFailed
 import viper.silver.verifier.{ConsistencyError, Failure, Success, VerificationResult}
 
@@ -293,7 +292,9 @@ trait DecreasesPlugin extends SilverPlugin {
     val methodDecreasesMap = extractedDecreasesExp._3
     val whileDecreasesMap = extractedDecreasesExp._4
 
-    transformToCheckProgram(newProgram, functionDecreasesMap, methodDecreasesMap, whileDecreasesMap)
+    val res = transformToCheckProgram(newProgram, functionDecreasesMap, methodDecreasesMap, whileDecreasesMap)
+    //println(res)
+    res
   }
 
 
@@ -322,7 +323,7 @@ trait DecreasesPlugin extends SilverPlugin {
     */
   def transformToCheckProgram(input: Program,
                               functionDecreasesMap: Map[Function, DecreasesExp] = Map.empty[Function, DecreasesExp],
-                              methodDecreasesMap: Map[Method, DecreasesExp] = Map.empty[Method, DecreasesExp],
+                              methodDecreasesMap: Map[String, DecreasesExp] = Map.empty[String, DecreasesExp],
                               whileDecreasesMap: Map[While, DecreasesExp] = Map.empty[While, DecreasesExp]): Program
 
   /**
@@ -369,9 +370,9 @@ trait DecreasesPlugin extends SilverPlugin {
     * @param program with at most one(!) DecreasesExp in functions postcondition.
     * @return verifiable program (i.e. without DecreasesExp in functions postconditions)
     */
-  private def extractDecreasesExp(program: Program): (Program, Map[Function, DecreasesExp], Map[Method, DecreasesExp], Map[While, DecreasesExp]) = {
+  private def extractDecreasesExp(program: Program): (Program, Map[Function, DecreasesExp], Map[String, DecreasesExp], Map[While, DecreasesExp]) = {
     val functionDecreaseMap = scala.collection.mutable.Map[Function, DecreasesExp]()
-    val methodDecreaseMap = scala.collection.mutable.Map[Method, DecreasesExp]()
+    val methodDecreaseMap = scala.collection.mutable.Map[String, DecreasesExp]()
     val whileDecreaseMap = scala.collection.mutable.Map[While, DecreasesExp]()
 
     val result: Program = ViperStrategy.Slim({
@@ -404,7 +405,7 @@ trait DecreasesPlugin extends SilverPlugin {
             m.copy(posts = posts)(m.pos, m.info, m.errT)
 
           if (decreases.nonEmpty) {
-            methodDecreaseMap += (newMethod -> decreases.head.asInstanceOf[DecreasesExp])
+            methodDecreaseMap += (newMethod.name -> decreases.head.asInstanceOf[DecreasesExp])
           }
           newMethod
         } else {

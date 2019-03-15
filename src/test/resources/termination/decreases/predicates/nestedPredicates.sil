@@ -37,4 +37,3 @@ predicate p2(i: Int)
 {
     i>0 ==> p2(i-1)
 }
-
