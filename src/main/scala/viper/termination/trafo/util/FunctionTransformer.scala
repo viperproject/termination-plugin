@@ -1,4 +1,4 @@
-package viper.termination.proofcode.util
+package viper.termination.trafo.util
 
 import viper.silver.ast._
 import viper.silver.ast.utility.Statements.EmptyStmt
@@ -6,7 +6,6 @@ import viper.silver.ast.utility.Statements.EmptyStmt
 /**
   * A basic interface which helps to write a function body (Exp) into a method body (Stmt).
   * Some basic transformations are already implemented.
-  * @tparam C: the context in which an expression is transformed.
   */
 trait FunctionTransformer extends LocManager {
 

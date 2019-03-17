@@ -1,9 +1,34 @@
-package viper.termination.proofcode.util
+package viper.termination.trafo.util
 
 import viper.silver.ast._
-import viper.silver.verifier.reasons.AssertionFalse
-import viper.silver.verifier.{AbstractErrorReason, errors}
+import viper.silver.verifier.reasons.{AssertionFalse, ErrorNode}
+import viper.silver.verifier.{AbstractErrorReason, AbstractVerificationError, ErrorReason, errors}
 import viper.termination.{DecreasesExp, DecreasesTuple}
+
+/*
+  All Errors and Reasons concerning termination checks and the Reason Factories.
+ */
+
+/**
+  * Error for all termination related failed assertions.
+  */
+case class TerminationFailed(offendingNode: ErrorNode, reason: ErrorReason, override val cached: Boolean = false) extends AbstractVerificationError {
+  val id = "termination.failed"
+  val text = s"Function might not terminate."
+
+  def withNode(offendingNode: errors.ErrorNode = this.offendingNode) = TerminationFailed(this.offendingNode, this.reason)
+  def withReason(r: ErrorReason) = TerminationFailed(offendingNode, r)
+}
+
+/**
+  * Interface for factories creating trafos of non-termination reasons.
+  */
+trait ReasonTrafoFactory{
+  def createNotDecrease(biggerDec: Seq[Exp], smallerDec: Seq[Exp], context: Context): ReTrafo
+  def createNotBounded(biggerDec: Seq[Exp], context: Context): ReTrafo
+  def createStar(context: Context): ReTrafo
+}
+
 
 //### SIMPLE REASONS ###
 case class SimpleReasonTrafoFactory(offendingNode: DecreasesTuple) extends ReasonTrafoFactory {

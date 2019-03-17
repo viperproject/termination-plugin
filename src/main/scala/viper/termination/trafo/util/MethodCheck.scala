@@ -1,17 +1,25 @@
-package viper.termination.proofcode.util
+package viper.termination.trafo.util
 
 import viper.silver.ast._
 import viper.silver.ast.utility.Rewriter.{ContextCustom, Strategy, Traverse}
 import viper.silver.ast.utility.ViperStrategy
 import viper.silver.verifier.errors.AssertFailed
-import viper.termination.proofcode.Methods
 import viper.termination.{DecreasesExp, DecreasesTuple}
 
 import scala.collection.immutable.ListMap
 
+/**
+  * Creates termination checks for methods.
+  */
 trait MethodCheck extends ProgramManager with DecreasesCheck with LocManager{
 
-  def cluster(m1: String, m2: String): Boolean = {
+  /**
+    * Checks if two methods call each other recursively (also indirect) (same cluster)
+    * @param m1 method one
+    * @param m2 method two
+    * @return true iff in same cluster
+    */
+  def sameCluster(m1: String, m2: String): Boolean = {
     val method1 = methods.get(m1)
     val method2 = methods.get(m2)
     if (method1.isDefined && method2.isDefined){
@@ -21,7 +29,15 @@ trait MethodCheck extends ProgramManager with DecreasesCheck with LocManager{
     }
   }
 
+  /**
+    * DecreasesExp for methods defined by the user.
+    */
   val methodsDec: Map[String, DecreasesExp]
+
+  /**
+    * @param method name
+    * @return DecreasesExp defined by the user if exists, otherwise a DecreasesTuple containing the methods parameter.
+    */
   def getMethodDecreasesExp(method: String): DecreasesExp = methodsDec.getOrElse(method, {
     val m = methods.get(method)
     if(m.isDefined) {
@@ -31,11 +47,15 @@ trait MethodCheck extends ProgramManager with DecreasesCheck with LocManager{
     }
   })
 
+  /**
+    * @param context to the body (method name etc.)
+    * @return Strategy to be used to transform a methods body.
+    */
   def methodStrategy(context: ProofMethodContext): Strategy[Node, ContextCustom[Node, ProofMethodContext]] =
     ViperStrategy.CustomContext[ProofMethodContext](methodTransformer, context, t = Traverse.BottomUp)
 
   private def methodTransformer: PartialFunction[(Node, ProofMethodContext), Node] = {
-    case (mc: MethodCall, context: ProofMethodContext) if cluster(mc.methodName, context.methodName) =>  // have to perform termination check
+    case (mc: MethodCall, context: ProofMethodContext) if sameCluster(mc.methodName, context.methodName) =>  // have to perform termination check
       // map of parameters
       val calledMethod = methods(mc.methodName)
       val mapFormalArgsToCalledArgs = ListMap(calledMethod.formalArgs.map(_.localVar).zip(mc.args): _*)

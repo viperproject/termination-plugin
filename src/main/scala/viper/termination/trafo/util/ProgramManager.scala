@@ -1,4 +1,4 @@
-package viper.termination.proofcode.util
+package viper.termination.trafo.util
 
 import viper.silver.ast._
 import viper.silver.verifier.AbstractError
@@ -14,7 +14,7 @@ trait ProgramManager{
   // original program
   val program: Program
 
-  // to report any errors
+  // to report any errors occurring during transformation
   val reportError: AbstractError => Unit
 
   // maps of all program features including the ones newly created/added
@@ -61,6 +61,9 @@ trait ProgramManager{
     newName
   }
 
+  /**
+    * Cached program for the gerNetProgram call.
+    */
   private var newProgram: Option[Program] = None
 
   /**

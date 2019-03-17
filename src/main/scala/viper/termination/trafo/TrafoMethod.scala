@@ -1,13 +1,13 @@
-package viper.termination.proofcode
+package viper.termination.trafo
 
 import viper.silver.ast._
 import viper.silver.verifier.AbstractError
-import viper.termination.proofcode.util._
+import viper.termination.trafo.util._
 import viper.termination.{DecreasesExp, DecreasesStar}
 
-class TerminationMethod(override val program: Program,
-                        override val methodsDec: Map[String, DecreasesExp],
-                        override val reportError: AbstractError => Unit)
+class TrafoMethod(override val program: Program,
+                  override val methodsDec: Map[String, DecreasesExp],
+                  override val reportError: AbstractError => Unit)
   extends ProgramManager with MethodCheck {
 
   /**

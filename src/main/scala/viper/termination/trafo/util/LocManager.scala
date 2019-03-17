@@ -1,4 +1,4 @@
-package viper.termination.proofcode.util
+package viper.termination.trafo.util
 
 import viper.silver.ast.utility.Statements.EmptyStmt
 import viper.silver.ast.{AccessPredicate, BinExp, CondExp, Domain, DomainFunc, DomainFuncApp, DomainType, Exp, FieldAccessPredicate, FuncApp, Function, If, Implies, Inhale, Int, LocalVar, LocalVarAssign, LocalVarDecl, MagicWand, Position, Predicate, PredicateAccess, PredicateAccessPredicate, Seqn, SimpleInfo, Stmt, Type, TypeVar, UnExp, Unfold, WildcardPerm}
@@ -7,8 +7,9 @@ import viper.silver.verifier.ConsistencyError
 import scala.collection.immutable.ListMap
 
 /**
-  * Adds nested statements for the used predicates to the check code
-  * and therefore also creates/manages variables representing the predicates.
+  * Utility methods for predicates representation in termination checks (Loc).
+  * Also manages the creation of such representations.
+  *
   * The following features are needed in the program:
   * "nested" domain function
   * "Loc" domain
@@ -22,9 +23,8 @@ trait LocManager extends ProgramManager {
 
   /**
     * Creates an Unfold with the given predicate access predicate and the nested relations.
-    *
-    * @param pap
-    * @return
+    * @param pap the predicate access predicate
+    * @return Seqn(Unfold(pap), [Nested Stmts])
     */
   def transformUnfold(pap: PredicateAccessPredicate): Stmt = {
 
@@ -141,11 +141,25 @@ trait LocManager extends ProgramManager {
     LocalVarAssign(assLocation, assValue)(pred.pos)
   }
 
+  /**
+    * All needed init predicate local variables.
+    * (Predicate variables which should be declared and defined at the beginning of the method)
+    */
   private val initPredLocVar: scala.collection.mutable.Map[String, scala.collection.mutable.Map[PredicateAccessPredicate, LocalVarDecl]] = scala.collection.mutable.Map()
 
+  /**
+    * Creates a unique init predicate local variable for this predicate for the method.
+    * @param method (name) in which the init predicate variable is used.
+    * @param p the predicate which has to be represented by the variable
+    * @return unique init predicate variable for the method
+    */
   def getInitPredLocVar(method: String, p: PredicateAccessPredicate): LocalVarDecl =
     initPredLocVar.getOrElseUpdate(method, scala.collection.mutable.Map()).getOrElseUpdate(p, uniquePredLocVar(p.loc))
 
+  /**
+    * @param method name
+    * @return all needed init predicate local variables of the method
+    */
   def getMethodsInitPredLocVar(method: String): Map[PredicateAccessPredicate, LocalVarDecl] = initPredLocVar.getOrElse(method, Map.empty).toMap
 
   /**

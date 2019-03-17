@@ -1,5 +1,5 @@
 
-package viper.termination.proofcode.util
+package viper.termination.trafo.util
 
 import viper.silver.ast.utility.Functions
 import viper.silver.ast.{ErrTrafo, Exp, FuncApp, Function, NodeTrafo, Seqn, Stmt}

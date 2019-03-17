@@ -8,7 +8,15 @@ import viper.silver.plugin.SilverPlugin
 import viper.silver.verifier.errors.AssertFailed
 import viper.silver.verifier.{ConsistencyError, Failure, Success, VerificationResult}
 
-
+/**
+  * Interface for plugins which use decreases clauses (DecreasesExp) of functions and methods.
+  * This includes following steps (in the according stages):
+  *
+  * (beforeResolve, beforeMethodFilter): Transformation of decreases clauses defined in Viper
+  * (e.g. in function postcondition: ensures decreases(list(xs))) into type checked DecreasesExp.
+  *
+  * (beforeVerify): Extract DecreasesExp from the program and call transformToCheckProgram.
+  */
 trait DecreasesPlugin extends SilverPlugin {
 
   // decreases keywords
@@ -16,52 +24,59 @@ trait DecreasesPlugin extends SilverPlugin {
   private val DECREASESSTAR = "decreasesStar"
 
   /** Called after parse AST has been constructed but before identifiers are resolved and the program is type checked.
+    *
     * Replaces all decreases function calls in postconditions with decreasesN function calls and
     * adds a domain with the necessary decreasesN functions.
-    * decreasesN functions are domain functions with N parameters of arbitrary type.
+    * (decreasesN functions are domain functions with N parameters of arbitrary type)
+    *
     * Replaces all predicates acc in decreases function calls, replaces them with function calls, representing the
     * the predicate acc.
+    *
     * Replaces all decreasesStar function calls in postconditions with unique decreasesStar function calls
     * and adds a domain with the unique function.
+    *
     * @param input Parse AST possibly containing the decreases clauses in postconditions
     * @return Modified Parse AST which now should type check
     */
   override def beforeResolve(input: PProgram): PProgram = {
-    // replace all decreases (calls in postconditions of functions)
-    // with decreasesN calls
-    // and add DecreasesDomain with all needed decreasesN functions
+
+    /**
+      * Perform the described replacements.
+      */
     def fixPDecreasesClauses(exp: PExp): PExp = exp match {
       case call: PCall if call.opName.equals(DECREASES)=>
-        // replace call
-        val argsSize = call.args.length
-        val functionName = addDecreasesNFunction(argsSize)
+        // replace decreases call
+        val functionName = getDecreasesNFunction(call.args.length)
         // replace predicates
         val newArgs = call.args.map {
-          case predicateCall: PCall if input.predicates.map(_.idndef.name).contains(predicateCall.idnuse.name) =>
+          case predicateCall: PCall if input.predicates.exists(_.idndef.name.equals(predicateCall.idnuse.name)) =>
             // a predicate with the same name exists
-            fixPredicateAccessPredicate(predicateCall)
-          case pap: PAccPred if input.predicates.map(_.idndef.name).contains(pap.loc.idnuse.name) =>
+            fixAccessPredicate(predicateCall)
+          case pap: PAccPred if input.predicates.exists(_.idndef.name.equals(pap.loc.idnuse.name)) =>
             // a predicate with the same name exists
-            fixPredicateAccessPredicate(pap.loc, pap.perm)
+            fixAccessPredicate(pap.loc, pap.perm)
           case default => default
         }
         call.copy(func = PIdnUse(functionName), args = newArgs).setPos(call)
       case call: PCall if call.opName.equals(DECREASESSTAR) =>
-        // number of arguments (0) is checked by the typechecker.
+        // replace decreasesStar call
+        // number of arguments is checked by the type checker.
         call.copy(func = PIdnUse(getDecreasesStarFunction)).setPos(call)
       case d => d
     }
 
     /**
-      * Replaces predicate accesses with function calls.
+      * Replaces predicate access with function call to domain function representing the predicate.
       * The predicate must be in the program!
-      * The arguments of the call are the arguments of the predicate plus the permission expression as last argument.
-      * @param pap
-      * @param perm
-      * @return
+      * The arguments of the new function are the arguments of the predicate
+      * plus the permission expression as last argument.
+      * @param pap the predicate access call to be replaced
+      * @param perm the permission of the predicate access
+      * @return function call to the new function
       */
-    def fixPredicateAccessPredicate(pap: POpApp, perm: PExp = PFullPerm()): PCall = {
+    def fixAccessPredicate(pap: POpApp, perm: PExp = PFullPerm()): PCall = {
       // a predicate with the same name must exists
+      assert(input.predicates.exists(_.idndef.name.equals(pap.opName)))
       val predicate = input.predicates.find(_.idndef.name.equals(pap.opName)).get
       val formalArg = predicate.formalArgs
       // use the same arguments!
@@ -69,29 +84,19 @@ trait DecreasesPlugin extends SilverPlugin {
       PCall(PIdnUse(function), pap.args :+ perm).setPos(pap)
     }
 
+    // check all postconditions of functions
     val functions = input.functions.map(function => {
       val posts = function.posts.map(fixPDecreasesClauses)
       function.copy(posts = posts).setPos(function)
     })
 
+    // check all postconditions of methods
     val methods = input.methods.map(method => {
-      if (method.body.isDefined) {
-        val posts = method.posts.map(fixPDecreasesClauses)
-
-        val body = Some(method.body.get.transform({
-          case w: PWhile =>
-            val invs = w.invs map fixPDecreasesClauses
-            w.copy(invs = invs)
-          case s => s
-        })(_ => true)
-        )
-
-        method.copy(posts = posts, body = body).setPos(method)
-      } else {
-        method
-      }
+      val posts = method.posts.map(fixPDecreasesClauses)
+      method.copy(posts = posts).setPos(method)
     })
 
+    // all domains including the new helper domain
     val domains = input.domains :+ {
       createHelperDomain(getHelperDomain, getDecreasesStarFunction, decreasesNFunctions.toMap, predicateFunctions.toMap)
     }
@@ -109,28 +114,23 @@ trait DecreasesPlugin extends SilverPlugin {
   /**
     * All needed decreasesN functions with N arguments
     * (N -> decreasesNFunction name)
-    * Has to be invertible
+    * Must be invertible!
     */
   private val decreasesNFunctions = collection.mutable.Map[Integer, String]()
 
   /**
-    * Adds a new function name to the decreasesNFunctions map if none exists for this
-    * many arguments.
+    * Adds a new function name to the decreasesNFunctions map if none exists for this many arguments.
     * @param argsSize: number of arguments needed
-    * @return name of decrease function
+    * @return name of decreaseN function
     */
-  private def addDecreasesNFunction(argsSize: Integer): String = {
-    if (!decreasesNFunctions.contains(argsSize)){
-      val newName: String = s"$$decreases$argsSize"
-      decreasesNFunctions(argsSize) = newName
-    }
-    decreasesNFunctions(argsSize)
+  private def getDecreasesNFunction(argsSize: Integer): String = {
+    decreasesNFunctions.getOrElseUpdate(argsSize, s"$$decreases$argsSize")
   }
 
   /**
     * All needed functions representing a predicate in the decrease clause
     * ((predicateName, arguments :+ perm) -> functionName)
-    * Has to be invertible
+    * Must be invertible
     */
   private val predicateFunctions = collection.mutable.Map[(String, Seq[PFormalArgDecl]), String]()
 
@@ -138,35 +138,25 @@ trait DecreasesPlugin extends SilverPlugin {
     * Adds a new predicate representing function's name to the predicateFunction map
     * if none exists for this predicate.
     * @param predicateName identifying the predicate
-    * @param args arguments of the predicate
+    * @param params of the predicate
     * @return name of the function
     */
-  private  def addPredicateFunctions(predicateName: String, args: Seq[PFormalArgDecl]): String = {
-    if (!predicateFunctions.contains((predicateName, args))){
-      val functionName: String = s"$$pred_$predicateName"
-      predicateFunctions((predicateName, args)) = functionName
-    }
-    predicateFunctions((predicateName, args))
+  private  def addPredicateFunctions(predicateName: String, params: Seq[PFormalArgDecl]): String = {
+    predicateFunctions.getOrElseUpdate((predicateName, params),
+      s"$$pred_${predicateName}_${params.flatten(_.idndef.name).mkString("$")}")
   }
 
-  private def getUniqueName(name: String, used: Set[String]): String = {
-    var i = 0
-    var newName = name
-    while(used.contains(newName)){
-      newName = name + i
-      i += 1
-    }
-    newName
-  }
-
+  /**
+    * @return unique name for the helper domain containing all the new functions
+    */
   private def getHelperDomain: String = {
     "$HelperDomain"
   }
 
   /**
-    * Creates a domain with some parameter types and containing the necessary domain functions.
+    * Creates a domain with parameter types and containing the necessary new domain functions.
     * @param name (unique) name of the domain
-    * @param decreasesStar (unique) name of the decreasesStar function (
+    * @param decreasesStar (unique) name of the decreasesStar function
     * @param decreasesN (unique) names of decreasesN functions (and number of arguments: N)
     * @param predicates (unique) names of functions representing predicates (and number of arguments)
     * @return domain containing all the wanted functions.
@@ -207,27 +197,47 @@ trait DecreasesPlugin extends SilverPlugin {
     PDomain(domainIdDef, typeVars, decreasesFunctions ++ predicateFunctions :+ decreasesStarFunction , Seq())
   }
 
+  /**
+    * @param whish to be unique
+    * @param used names
+    * @return unique name similar to wish
+    */
+  private def getUniqueName(whish: String, used: Set[String]): String = {
+    var i = 0
+    var newName = whish
+    while(used.contains(newName)){
+      newName = whish + i
+      i += 1
+    }
+    newName
+  }
+
 
   /** Called after parse AST has been translated into the normal AST but before methods to verify are filtered.
+    *
     * Replace all decreasesN function calls in postconditions (from the beforeResolve step)
     * with DecreasesTuple expressions.
+    *
     * Replaces all function calls representing a predicate acc (from the beforeResolve step)
     * with predicate acc.
+    *
     * Replaces all decreasesStar functions in postconditions (from the beforeResolve step)
     * with DecreasesStar expressions.
+    *
     * @param input AST
     * @return Modified AST possibly with DecreasesExp (DecreasesTuple or DecreasesStar) in the postconditions of functions.
     */
   override def beforeMethodFilter(input: Program): Program = {
-    // get decreases function calls in post conditions and
-    // transform them to post condition with a DecreasesExp
-    // also transform all functions representing predicates back
 
     val helperDomain = getHelperDomain
     val decStarFunc = getDecreasesStarFunction
+    // invert maps once for convenience (and performance)
     val decNFuncInverted = decreasesNFunctions.toMap.map(_.swap)
     val predFuncInverted = predicateFunctions.toMap.map(_.swap)
 
+    /**
+      * Perform the described replacements.
+      */
     def createDecreasesExp(exp: Exp): Exp = exp match {
       case c: Call if c.callee.equals(decStarFunc) =>
         // replace all decreasesStar functions with DecreasesStar
@@ -261,19 +271,19 @@ trait DecreasesPlugin extends SilverPlugin {
         // replace decreasesN calls in postconditions with DecreasesExp
         val posts = m.posts map createDecreasesExp
         m.copy(posts = posts)(m.pos, m.info, m.errT)
-      case w: While =>
-        // replace decreasesN calls in postconditions with DecreasesExp
-        val invs = w.invs map createDecreasesExp
-        w.copy(invs = invs)(w.pos, w.info, w.errT)
     }).execute(input)
   }
 
   /** Called after methods are filtered but before the verification by the backend happens.
-    * Checks that functions are not (indirectly) recursively defined via its DecreasesExp or multiple DecreasesExp are
-    * defined for one functions (otherwise consistency errors are reported and the verification stopped).
-    * Extracts all DecreasesExp from the postcondition of functions and uses them to create proof code.
-    * @param input AST possibly with DecreasesExp (DecreasesTuple or DecreasesStar) in the postconditions of functions.
-    * @return Modified AST without DecreasesExp in postconditions of functions.
+    *
+    * Checks that functions are not (indirectly) recursively defined via its DecreasesExp
+    * Check that not multiple DecreasesExp are defined for one function or method
+    * (otherwise consistency errors are reported and the verification stopped).
+    *
+    * Extracts all DecreasesExp from the program (postconditions of functions and methods)
+    * and uses them to call transformToCheckProgram.
+    * @param input AST possibly with DecreasesExp (DecreasesTuple or DecreasesStar).
+    * @return Modified AST without DecreasesExp.
     */
   override def beforeVerify(input: Program): Program = {
     val errors = checkNoFunctionRecursesViaDecreasesClause(input) ++ checkNoMultipleDecreasesClause(input)
@@ -290,10 +300,8 @@ trait DecreasesPlugin extends SilverPlugin {
     val newProgram: Program = extractedDecreasesExp._1
     val functionDecreasesMap = extractedDecreasesExp._2
     val methodDecreasesMap = extractedDecreasesExp._3
-    val whileDecreasesMap = extractedDecreasesExp._4
 
-    val res = transformToCheckProgram(newProgram, functionDecreasesMap, methodDecreasesMap, whileDecreasesMap)
-    //println(res)
+    val res = transformToCheckProgram(newProgram, functionDecreasesMap, methodDecreasesMap)
     res
   }
 
@@ -318,13 +326,14 @@ trait DecreasesPlugin extends SilverPlugin {
     * Creates a Program containing all the wanted termination checks (defined by a concrete plugin)
     *
     * @param input verifiable program (i.e. no DecreasesExp in postconditions)
-    * @param functionDecreasesMap all decreases exp (defined by the user)
+    * @param functionDecreasesMap all decreases exp of functions (defined by the user)
+    * @param methodDecreasesMap all decreases exp of methods (defined by the user)
     * @return a program with the additional termination checks (including the input program)
     */
   def transformToCheckProgram(input: Program,
                               functionDecreasesMap: Map[Function, DecreasesExp] = Map.empty[Function, DecreasesExp],
-                              methodDecreasesMap: Map[String, DecreasesExp] = Map.empty[String, DecreasesExp],
-                              whileDecreasesMap: Map[While, DecreasesExp] = Map.empty[While, DecreasesExp]): Program
+                              methodDecreasesMap: Map[String, DecreasesExp] = Map.empty[String, DecreasesExp])
+      : Program
 
   /**
     * Checks if a function is defined recursively via its decrease clause (DecreasesExp in postconditions),
@@ -362,18 +371,24 @@ trait DecreasesPlugin extends SilverPlugin {
         errors :+= ConsistencyError(msg, f.pos)
       }
     })
+    program.methods.foreach(m => {
+      if (m.posts.count(_.isInstanceOf[DecreasesExp]) > 1){
+        // more than one decreases clause detected for method m
+        val msg = s"Method ${m.name} contains more than one decreases clause."
+        errors :+= ConsistencyError(msg, m.pos)
+      }
+    })
     errors
   }
 
   /**
-    * Extracts one(!) DecreasesExp in functions postconditions.
-    * @param program with at most one(!) DecreasesExp in functions postcondition.
-    * @return verifiable program (i.e. without DecreasesExp in functions postconditions)
+    * Extracts one(!) DecreasesExp in postconditions of functions and methods.
+    * @param program with DecreasesExp.
+    * @return verifiable program (i.e. without DecreasesExp)
     */
-  private def extractDecreasesExp(program: Program): (Program, Map[Function, DecreasesExp], Map[String, DecreasesExp], Map[While, DecreasesExp]) = {
+  private def extractDecreasesExp(program: Program): (Program, Map[Function, DecreasesExp], Map[String, DecreasesExp]) = {
     val functionDecreaseMap = scala.collection.mutable.Map[Function, DecreasesExp]()
     val methodDecreaseMap = scala.collection.mutable.Map[String, DecreasesExp]()
-    val whileDecreaseMap = scala.collection.mutable.Map[While, DecreasesExp]()
 
     val result: Program = ViperStrategy.Slim({
       case f: Function =>
@@ -412,25 +427,7 @@ trait DecreasesPlugin extends SilverPlugin {
           // none decreases clause
           m
         }
-      case w: While =>
-        val partition = w.invs.partition(p => p.isInstanceOf[DecreasesExp])
-        val decreases = partition._1
-        val invs = partition._2
-
-        if (decreases.nonEmpty) {
-          // one DecreasesExp found
-          val newWhile =
-            w.copy(invs = invs)(w.pos, w.info, w.errT)
-
-          if (decreases.nonEmpty) {
-            whileDecreaseMap += (newWhile -> decreases.head.asInstanceOf[DecreasesExp])
-          }
-          newWhile
-        } else {
-          // none decreases clause
-          w
-        }
     }).execute(program)
-    (result, functionDecreaseMap.toMap, methodDecreaseMap.toMap, whileDecreaseMap.toMap)
+    (result, functionDecreaseMap.toMap, methodDecreaseMap.toMap)
   }
 }

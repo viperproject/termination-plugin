@@ -1,15 +1,15 @@
-package viper.termination.proofcode
+package viper.termination.trafo
 
 import viper.silver.ast._
 import viper.silver.verifier.AbstractError
-import viper.termination.proofcode.util._
 import viper.termination.{DecreasesExp, DecreasesStar}
+import viper.termination.trafo.util._
 
-class TerminationProofPath(override val program: Program,
-                           override val functionsDec: Map[Function, DecreasesExp],
-                           override val methodsDec: Map[String, DecreasesExp],
-                           override val reportError: AbstractError => Unit)
-  extends ProgramManager with MethodCheck with FunctionCheckPath {
+class Trafo(override val program: Program,
+            override val functionsDec: Map[Function, DecreasesExp],
+            override val methodsDec: Map[String, DecreasesExp],
+            override val reportError: AbstractError => Unit)
+  extends ProgramManager with MethodCheck with FunctionCheck {
 
   /**
     * Creates a new program with the additional features.
@@ -35,7 +35,8 @@ class TerminationProofPath(override val program: Program,
 
     program.functions.filterNot(f => f.body.isEmpty || getFunctionDecreasesExp(f).isInstanceOf[DecreasesStar]).foreach(f => {
       val methodName = uniqueName(f.name + "_termination_proof")
-      val context = FContext(f, methodName, Nil, Set.empty + f.name)
+      val context = FContext(f, methodName)
+
       val body = transformFuncBody(f.body.get, context)
 
       // get all predicate init values which are used.
@@ -51,13 +52,6 @@ class TerminationProofPath(override val program: Program,
     super.createCheckProgram()
   }
 
-  case class FContext(override val func: Function,
-                      override val methodName: String,
-                      override val funcAppList: Seq[FuncApp],
-                      override val alreadyChecked: Set[String]) extends PathContext {
-    override def copy(newFuncAppList: Seq[FuncApp], newAlreadyChecked: Set[String]): PathContext = {
-      FContext(func, methodName, newFuncAppList, newAlreadyChecked)
-    }
-  }
+  case class FContext(override val func: Function, override val methodName: String) extends FunctionContext
   case class MContext(override val methodName: String) extends ProofMethodContext
 }

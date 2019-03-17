@@ -1,4 +1,4 @@
-package viper.termination.proofcode.util
+package viper.termination.trafo.util
 
 import viper.silver.ast.utility.Statements.EmptyStmt
 import viper.silver.ast._
@@ -10,11 +10,10 @@ import scala.collection.immutable.ListMap
 
 /**
   * A basic interface to help create termination checks.
+  *
   * Therefore it needs following things in the program:
   * "decreasing" domain function
   * "bounded" domain function
-  *
-  * It adds dummy function to the program if needed.
   */
 trait DecreasesCheck extends ProgramManager with LocManager {
 
@@ -102,7 +101,8 @@ trait DecreasesCheck extends ProgramManager with LocManager {
 
   /**
     * If expressions are not empty
-    * creates Expression to check decrease and bounded of lexicographical order
+    * creates Expression to check decrease and bounded of lexicographical order.
+    * The bigger expressions are all enclosed in old() expressions!
     * (decreasing(s,b) && bounded(b)) || (s==b && ( (decr...
     * decreasing and bounded must be defined!
     * @param biggerExp [b,..] (can also be empty)
@@ -122,6 +122,9 @@ trait DecreasesCheck extends ProgramManager with LocManager {
       val paramTypesBound = boundedFunc.get.formalArgs map (_.typ)
       val argTypeVarsBound = paramTypesBound.flatMap(p => p.typeVariables)
 
+      /**
+        * Recursive function to create the check expression
+        */
       def createExp(biggerExp: Seq[Exp], smallerExp: Seq[Exp]): Exp = {
         assert(biggerExp.nonEmpty)
         assert(biggerExp.size == smallerExp.size)
@@ -163,24 +166,4 @@ trait DecreasesCheck extends ProgramManager with LocManager {
   def reportBoundedNotDefined(pos: Position): Unit = {
     reportError(ConsistencyError("Bounded function is needed but not defined.", pos))
   }
-}
-
-/**
-  * Error for all termination related failed assertions.
-  */
-case class TerminationFailed(offendingNode: ErrorNode, reason: ErrorReason, override val cached: Boolean = false) extends AbstractVerificationError {
-  val id = "termination.failed"
-  val text = s"Function might not terminate."
-
-  def withNode(offendingNode: errors.ErrorNode = this.offendingNode) = TerminationFailed(this.offendingNode, this.reason)
-  def withReason(r: ErrorReason) = TerminationFailed(offendingNode, r)
-}
-
-/**
-  * Interface for factories creating trafos of non-termination reasons.
-  */
-trait ReasonTrafoFactory{
-  def createNotDecrease(biggerDec: Seq[Exp], smallerDec: Seq[Exp], context: Context): ReTrafo
-  def createNotBounded(biggerDec: Seq[Exp], context: Context): ReTrafo
-  def createStar(context: Context): ReTrafo
 }
