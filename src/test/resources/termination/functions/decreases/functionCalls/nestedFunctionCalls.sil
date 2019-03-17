@@ -7,7 +7,7 @@ ensures decreases(x)
 }
 
 function g(x: Int): Int
-ensures result == 1
+//ensures result == 1
 ensures decreases(x)
 {
   x > 1 ? h(g(x-1)-1) : 1

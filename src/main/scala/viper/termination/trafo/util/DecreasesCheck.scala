@@ -92,7 +92,7 @@ trait DecreasesCheck extends ProgramManager with LocManager {
           }
           EmptyStmt
         }
-      case default =>
+      case _ =>
         assert(assertion = false, "Checking a function with DecreasesStar for termination!" +
           "This should not happen!")
         Assert(FalseLit()())(errT = errTrafo)

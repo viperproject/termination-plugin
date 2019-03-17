@@ -9,11 +9,4 @@ method m(x: Int)
     }else {
       m(x-1)
     }
-
-    var y: Int := x
-    while(y >= 0)
-        invariant decreases(y)
-    {
-        y := y - 1
-    }
 }
