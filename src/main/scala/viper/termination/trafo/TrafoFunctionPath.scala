@@ -2,6 +2,7 @@
 package viper.termination.trafo
 
 import viper.silver.ast._
+import viper.silver.ast.utility.Rewriter.Traverse
 import viper.silver.ast.utility.ViperStrategy
 import viper.silver.verifier.AbstractError
 import viper.termination.trafo.util._
@@ -28,7 +29,8 @@ class TrafoFunctionPath(override val program: Program,
 
       val posts = f.posts.map(p => ViperStrategy.Slim({
         case r@Result() => LocalVar(resultVariableName)(r.typ, r.pos, r.info, NodeTrafo(r))
-      }).execute[Exp](p))
+      }, Traverse.BottomUp).execute[Exp](p))
+
 
       val postsCheck = posts.map(transformFuncBody(_, context))
       val bodyCheck = transformFuncBody(f.body.get, context)

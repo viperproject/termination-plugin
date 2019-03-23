@@ -7,7 +7,7 @@ domain nestedDomain{
     
     //Transitivity of the nested-Function
     axiom nestedTrans{
-        forall l1: Loc, l2: Loc, l3: Loc :: {nested(l1, l2)} {nested(l2, l3)}
+        forall l1: Loc, l2: Loc, l3: Loc :: {nested(l1, l2), nested(l2, l3)}
         nested(l1,l2) && nested(l2,l3) ==> nested(l1,l3)
     }
     
