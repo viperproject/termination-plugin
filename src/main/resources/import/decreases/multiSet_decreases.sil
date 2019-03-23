@@ -7,6 +7,7 @@ domain MuliSetTerminationOrder[S]{
         (|mSet1| < |mSet2|) ==> decreasing(mSet1, mSet2)
     }
     axiom multiSet_ax_bound{
-        forall mSet1: Multiset[S] :: bounded(mSet1)
+        forall mSet1: Multiset[S] :: {bounded(mSet1)}
+        bounded(mSet1)
     }
 }
