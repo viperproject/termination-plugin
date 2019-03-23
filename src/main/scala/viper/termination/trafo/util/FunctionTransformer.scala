@@ -94,8 +94,8 @@ trait FunctionTransformer extends LocManager {
     * @param context in which the transformation happens
     * @return the transformed expression
     */
-  def transformExp(exp: Exp, context: Context): Exp = {
-    exp
+  def transformExp: PartialFunction[(Exp, Context), Exp] = {
+    case (e, c) => e
   }
 }
 

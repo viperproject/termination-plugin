@@ -28,7 +28,6 @@ trait FunctionCheck extends ProgramManager with DecreasesCheck with FunctionTran
   }
   val functionsDec: Map[Function, DecreasesExp]
 
-
   /**
     * Adds case FuncApp
     * Checks if the termination measure decreases in every function call (to a possibly

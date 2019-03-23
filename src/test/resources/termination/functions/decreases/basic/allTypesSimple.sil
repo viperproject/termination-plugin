@@ -18,7 +18,7 @@ ensures decreases(r)
 
 //Example decreasing Booleans
 function booleans(b: Bool): Int
-ensures booleans(b) == 1
+ensures result == 1
 ensures decreases(b)
 {
     b ? 1 : booleans(true)
@@ -27,7 +27,7 @@ ensures decreases(b)
 
 //Example decreasing Sequences (Integers)
 function numberOfElements(seq:Seq[Int]): Int
-ensures numberOfElements(seq) == |seq|
+ensures result == |seq|
 ensures decreases(seq)
 {
     |seq| != 0? 1+numberOfElements(seq[1..]) : 0
