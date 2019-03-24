@@ -4,14 +4,14 @@ import viper.silver.ast._
 import viper.silver.ast.utility.Rewriter.{ContextCustom, Strategy, Traverse}
 import viper.silver.ast.utility.ViperStrategy
 import viper.silver.verifier.errors.AssertFailed
-import viper.termination.{DecreasesExp, DecreasesTuple}
+import viper.termination.{DecreasesExp, DecreasesStar, DecreasesTuple}
 
 import scala.collection.immutable.ListMap
 
 /**
   * Creates termination checks for methods.
   */
-trait MethodCheck extends ProgramManager with DecreasesCheck with LocManager{
+trait MethodCheck extends CheckProgramManager with DecreasesCheck with LocManager{
 
   /**
     * Checks if two methods call each other recursively (also indirect) (same cluster)
@@ -48,6 +48,30 @@ trait MethodCheck extends ProgramManager with DecreasesCheck with LocManager{
   })
 
   /**
+    * Creates a new program with the additional features.
+    * Should only be called once.
+    *
+    * @return new program.
+    */
+  override protected def generateCheckProgram(): Program = {
+    program.methods.filterNot(m => m.body.isEmpty || getMethodDecreasesExp(m.name).isInstanceOf[DecreasesStar]).foreach(m => {
+      val context = MContext(m.name)
+
+      val body: Stmt = methodStrategy(context).execute(m.body.get)
+
+      // get all predicate init values which are used.
+      val newVarPred = getMethodsInitPredLocVar(m.name)
+      val newVarPredAss: Seq[Stmt] = newVarPred.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
+
+      val methodBody: Seqn = Seqn(newVarPredAss :+ body, newVarPred.values.toIndexedSeq)()
+      val method = m.copy(body = Option(methodBody))(m.pos, m.info, m.errT)
+
+      methods(m.name) = method
+    })
+    super.generateCheckProgram()
+  }
+
+  /**
     * @param context to the body (method name etc.)
     * @return Strategy to be used to transform a methods body.
     */
@@ -79,4 +103,6 @@ trait MethodCheck extends ProgramManager with DecreasesCheck with LocManager{
       Seqn(Seq(assertion, mc), Nil)(mc.pos, NoInfo, NodeTrafo(mc))
     case (u: Unfold, c: ProofMethodContext) => transformUnfold(u.acc)
   }
+
+  case class MContext(override val methodName: String) extends ProofMethodContext
 }

@@ -1,14 +1,15 @@
 
 package viper.termination.trafo.util
 
-import viper.silver.ast.utility.Functions
-import viper.silver.ast.{ErrTrafo, Exp, FuncApp, Function, NodeTrafo, Seqn, Stmt}
+import viper.silver.ast.utility.Rewriter.Traverse
+import viper.silver.ast.utility.{Functions, ViperStrategy}
+import viper.silver.ast.{ErrTrafo, Exp, FuncApp, Function, LocalVar, LocalVarDecl, Method, NodeTrafo, Program, Result, Seqn, Stmt}
 import viper.silver.verifier.errors.AssertFailed
-import viper.termination.{DecreasesExp, DecreasesTuple}
+import viper.termination.{DecreasesExp, DecreasesStar, DecreasesTuple}
 
 import scala.collection.immutable.ListMap
 
-trait FunctionCheckPath extends ProgramManager with DecreasesCheck with FunctionTransformer {
+trait FunctionCheckPath extends CheckProgramManager with DecreasesCheck with FunctionTransformer {
 
   private val heights: Map[Function, Int] = Functions.heights(program)
   private def compareHeights(f1: Function, f2: Function): Boolean = {
@@ -27,6 +28,42 @@ trait FunctionCheckPath extends ProgramManager with DecreasesCheck with Function
     })
   }
   val functionsDec: Map[Function, DecreasesExp]
+
+  /**
+    * Creates a new program with the additional features.
+    * Should only be called once.
+    *
+    * @return new program.
+    */
+  override protected def generateCheckProgram(): Program = {
+    program.functions.filterNot(f => f.body.isEmpty || getFunctionDecreasesExp(f).isInstanceOf[DecreasesStar]).foreach(f => {
+      val methodName = uniqueName(f.name + "_termination_proof")
+      val context = FContext(f, methodName, Nil, Set.empty + f.name)
+
+      val resultVariableName = "$result"
+      val resultVariable = LocalVarDecl(resultVariableName, f.typ)(f.result.pos, f.result.info, NodeTrafo(f.result))
+
+      // TODO: check posts in another function and assume already checked postconditions
+      val posts = f.posts.map(p => ViperStrategy.Slim({
+        case r@Result() => LocalVar(resultVariableName)(r.typ, r.pos, r.info, NodeTrafo(r))
+      }, Traverse.BottomUp).execute[Exp](p))
+
+
+      val postsCheck = posts.map(transformFuncBody(_, context))
+      val bodyCheck = transformFuncBody(f.body.get, context)
+
+      // get all predicate init values which are used.
+      val newVarPred = getMethodsInitPredLocVar(methodName)
+      val newVarPredAss: Seq[Stmt] = newVarPred.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
+
+      val methodBody: Seqn = Seqn(newVarPredAss ++ postsCheck :+ bodyCheck, newVarPred.values.toIndexedSeq)()
+      val method = Method(methodName, f.formalArgs, Seq(resultVariable), f.pres, Nil, Option(methodBody))()
+
+      methods(methodName) = method
+    })
+
+    super.generateCheckProgram()
+  }
 
   /**
     * Adds case FuncApp.
@@ -102,6 +139,15 @@ trait FunctionCheckPath extends ProgramManager with DecreasesCheck with Function
       Seqn(stmts, Nil)()
 
     case default => super.transformFuncBody(default)
+  }
+
+  case class FContext(override val func: Function,
+                      override val methodName: String,
+                      override val funcAppList: Seq[FuncApp],
+                      override val alreadyChecked: Set[String]) extends PathContext {
+    override def copy(newFuncAppList: Seq[FuncApp], newAlreadyChecked: Set[String]): PathContext = {
+      FContext(func, methodName, newFuncAppList, newAlreadyChecked)
+    }
   }
 }
 

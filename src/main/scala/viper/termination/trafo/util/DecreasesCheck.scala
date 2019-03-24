@@ -2,8 +2,7 @@ package viper.termination.trafo.util
 
 import viper.silver.ast.utility.Statements.EmptyStmt
 import viper.silver.ast._
-import viper.silver.verifier.reasons.ErrorNode
-import viper.silver.verifier.{AbstractVerificationError, ConsistencyError, ErrorReason, errors}
+import viper.silver.verifier.ConsistencyError
 import viper.termination.{DecreasesExp, DecreasesStar, DecreasesTuple}
 
 import scala.collection.immutable.ListMap
@@ -15,10 +14,10 @@ import scala.collection.immutable.ListMap
   * "decreasing" domain function
   * "bounded" domain function
   */
-trait DecreasesCheck extends ProgramManager with LocManager {
+trait DecreasesCheck extends CheckProgramManager with LocManager {
 
-  val decreasingFunc: Option[DomainFunc] = program.findDomainFunctionOptionally("decreasing")
-  val boundedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("bounded")
+  protected val decreasingFunc: Option[DomainFunc] = program.findDomainFunctionOptionally("decreasing")
+  protected val boundedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("bounded")
 
   /**
     * Creates a termination check.

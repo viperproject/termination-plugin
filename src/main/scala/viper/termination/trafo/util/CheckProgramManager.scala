@@ -9,7 +9,7 @@ import scala.collection.mutable
   * An interface which offers to add additional code to a program
   * without causing name conflicts.
   */
-trait ProgramManager{
+trait CheckProgramManager{
 
   // original program
   val program: Program
@@ -69,9 +69,9 @@ trait ProgramManager{
   /**
     * @return the new program containing all the added checks.
     */
-  final def getNewProgram: Program = {
+  final def getCheckProgram: Program = {
     if(newProgram.isEmpty){
-      newProgram = Some(createCheckProgram())
+      newProgram = Some(generateCheckProgram())
     }
     newProgram.get
   }
@@ -81,7 +81,7 @@ trait ProgramManager{
     * Should only be called once.
     * @return new program.
     */
-  protected def createCheckProgram(): Program = {
+  protected def generateCheckProgram(): Program = {
     Program(domains.values.toSeq,
       fields.values.toSeq,
       functions.values.toSeq,

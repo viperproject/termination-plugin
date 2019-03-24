@@ -3,7 +3,8 @@ package viper.termination
 
 import viper.silver.ast
 import viper.silver.ast.Program
-import viper.termination.trafo.TrafoMethod
+import viper.termination.trafo.Trafo
+import viper.termination.trafo.util.{FunctionCheckPath, MethodCheck}
 
 /**
   * Adds termination checks to methods.
@@ -11,7 +12,9 @@ import viper.termination.trafo.TrafoMethod
   */
 class DecreasesMethod extends DecreasesPlugin {
   override def transformToCheckProgram(input: Program, functionDecreasesMap: Map[ast.Function, DecreasesExp], methodDecreasesMap: Map[String, DecreasesExp]): Program = {
-    val termCheck = new TrafoMethod(input, methodDecreasesMap, reportError)
-    termCheck.getNewProgram
+    val termCheck = new Trafo(input, reportError) with MethodCheck{
+      override val methodsDec: Map[String, DecreasesExp] = methodDecreasesMap
+    }
+    termCheck.getCheckProgram
   }
 }
