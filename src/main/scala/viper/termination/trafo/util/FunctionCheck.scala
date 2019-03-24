@@ -3,7 +3,7 @@ package viper.termination.trafo.util
 
 import viper.silver.ast.utility.{Functions, ViperStrategy}
 import viper.silver.ast.utility.Rewriter.Traverse
-import viper.silver.ast.{ErrTrafo, Exp, FuncApp, Function, LocalVar, LocalVarDecl, Method, NodeTrafo, Program, Result, Seqn, Stmt}
+import viper.silver.ast.{ErrTrafo, Exp, FuncApp, Function, Inhale, LocalVar, LocalVarDecl, Method, NodeTrafo, Program, Result, Seqn, Stmt}
 import viper.silver.verifier.errors.AssertFailed
 import viper.termination.{DecreasesExp, DecreasesStar, DecreasesTuple}
 
@@ -31,32 +31,51 @@ trait FunctionCheck extends CheckProgramManager with DecreasesCheck with Functio
 
   protected override def generateCheckProgram(): Program = {
     program.functions.filterNot(f => f.body.isEmpty || getFunctionDecreasesExp(f).isInstanceOf[DecreasesStar]).foreach(f => {
-      val methodName = uniqueName(f.name + "_termination_proof")
-      val context = FContext(f, methodName)
+      // method proving termination of the functions body.
+      val checkMethodNameBody = uniqueName(f.name + "_termination_proof")
+      val contextBody = FContext(f, checkMethodNameBody)
 
+      val checkBody = transformFuncBody(f.body.get, contextBody)
+
+      // get all predicate init values which are used.
+      val newVarBody = getMethodsInitPredLocVar(checkMethodNameBody)
+      val newVarAssBody: Seq[Stmt] = newVarBody.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
+
+      val checkMethodBody = Method(checkMethodNameBody, f.formalArgs, Nil, f.pres, Nil,
+                              Option(Seqn(newVarAssBody :+ checkBody, newVarBody.values.toIndexedSeq)()))()
+
+      methods(checkMethodNameBody) = checkMethodBody
+
+
+      // method proving termination of postconditions.
+      val checkMethodNamePosts = uniqueName(f.name + "_posts_termination_proof")
+      val contextPosts = FContext(f, checkMethodNamePosts)
       val resultVariableName = "$result"
       val resultVariable = LocalVarDecl(resultVariableName, f.typ)(f.result.pos, f.result.info, NodeTrafo(f.result))
 
-      // TODO: check posts in another function and assume already checked postconditions
+      // replace all Result nodes with the result variable.
       val posts = f.posts.map(p => ViperStrategy.Slim({
         case r@Result() => LocalVar(resultVariableName)(r.typ, r.pos, r.info, NodeTrafo(r))
       }, Traverse.BottomUp).execute[Exp](p))
 
-      val postsCheck = posts.map(transformFuncBody(_, context))
-      val bodyCheck = transformFuncBody(f.body.get, context)
+      // after the termination checks assume the postcondition.
+      val checkPosts = posts.map(p => {
+        Seqn(Seq(transformFuncBody(p, contextPosts), Inhale(p)(p.pos, p.info, p.errT)), Nil)()
+      })
 
       // get all predicate init values which are used.
-      val newVarPred = getMethodsInitPredLocVar(methodName)
-      val newVarPredAss: Seq[Stmt] = newVarPred.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
+      val newVarPosts = getMethodsInitPredLocVar(checkMethodNamePosts)
+      val newVarAssPosts: Seq[Stmt] = newVarPosts.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
 
-      val methodBody: Seqn = Seqn(newVarPredAss ++ postsCheck :+ bodyCheck, newVarPred.values.toIndexedSeq)()
-      val method = Method(methodName, f.formalArgs, Seq(resultVariable), f.pres, Nil, Option(methodBody))()
+      val checkMethodPosts = Method(checkMethodNamePosts, f.formalArgs, Seq(resultVariable), f.pres, Nil,
+                          Option(Seqn(newVarAssPosts ++ checkPosts, newVarPosts.values.toIndexedSeq)()))()
 
-      methods(methodName) = method
+      methods(checkMethodNamePosts) = checkMethodPosts
     })
 
     super.generateCheckProgram()
   }
+
 
   /**
     * Adds case FuncApp
