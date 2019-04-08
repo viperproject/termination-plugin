@@ -4,12 +4,12 @@ import "pred_support.sil"
 domain Decreasing{
 
     axiom decreasinglocations{
-        forall l1: Loc, l2: Loc :: {nested(l1,l2)}
+        forall l1: PredicateInstance, l2: PredicateInstance :: {nested(l1,l2)}
             decreasing(l1, l2) <==> nested(l1,l2)
     }
 
     axiom boundedlocations{
-        forall l1: Loc :: {bounded(l1)}
+        forall l1: PredicateInstance :: {bounded(l1)}
             bounded(l1)
     }
 }

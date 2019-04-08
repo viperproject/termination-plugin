@@ -3,7 +3,7 @@ import "dec.sil"
 domain BoolTerminationOrder{
     //Booleans
     axiom bool_ax_dec{
-        bool1 ==> decreasing(true, false)
+        decreasing(true, false)
     }
     axiom bool_ax_bound{
         forall bool1: Bool :: {bounded(bool1)}
