@@ -25,3 +25,6 @@ To use the plugin it has to be on the Java classpath. When invoking the back end
 
 ### Test
 You can run tests of the Termination Plugin by running `sbt test`.
+
+Tests are currently only done with Silicon as back-end.
+Testing with Carbon should be enabled in the future (TODO).
