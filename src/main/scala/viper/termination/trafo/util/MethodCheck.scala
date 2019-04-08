@@ -11,7 +11,7 @@ import scala.collection.immutable.ListMap
 /**
   * Creates termination checks for methods.
   */
-trait MethodCheck extends CheckProgramManager with DecreasesCheck with LocManager{
+trait MethodCheck extends CheckProgramManager with DecreasesCheck with PredicateInstanceManager{
 
   /**
     * Checks if two methods call each other recursively (also indirect) (same cluster)

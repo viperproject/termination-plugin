@@ -7,7 +7,7 @@ import viper.silver.ast.utility.Statements.EmptyStmt
   * A basic interface which helps to write a function body (Exp) into a method body (Stmt).
   * Some basic transformations are already implemented.
   */
-trait FunctionTransformer extends LocManager {
+trait FunctionTransformer extends PredicateInstanceManager {
 
   /**
     * Transforms an expression (e.g. function body) into a statement.

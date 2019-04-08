@@ -14,7 +14,7 @@ import scala.collection.immutable.ListMap
   * "decreasing" domain function
   * "bounded" domain function
   */
-trait DecreasesCheck extends CheckProgramManager with LocManager {
+trait DecreasesCheck extends CheckProgramManager with PredicateInstanceManager {
 
   protected val decreasingFunc: Option[DomainFunc] = program.findDomainFunctionOptionally("decreasing")
   protected val boundedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("bounded")
@@ -48,7 +48,7 @@ trait DecreasesCheck extends CheckProgramManager with LocManager {
 
           val checkableBiggerExp = bExp.map({
             case pa: PredicateAccessPredicate =>
-              if (locationDomain.isDefined) {
+              if (PredicateInstanceDomain.isDefined) {
                 // use the init predicate variable
                 val varOfCalleePred = getInitPredLocVar(context.methodName, pa)
                 varOfCalleePred.localVar
@@ -64,7 +64,7 @@ trait DecreasesCheck extends CheckProgramManager with LocManager {
 
           val checkableSmallerExp = sExp.map({
             case pa: PredicateAccessPredicate =>
-              if (locationDomain.isDefined) {
+              if (PredicateInstanceDomain.isDefined) {
                 val varOfCalleePred = uniquePredLocVar(pa.loc)
                 newVarPred(pa) = varOfCalleePred
                 varOfCalleePred.localVar

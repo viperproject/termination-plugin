@@ -7,17 +7,17 @@ import viper.silver.verifier.ConsistencyError
 import scala.collection.immutable.ListMap
 
 /**
-  * Utility methods for predicates representation in termination checks (Loc).
-  * Also manages the creation of such representations.
+  * Utility methods for predicate instances in termination checks.
+  * Also manages the creation of such instances.
   *
   * The following features are needed in the program:
   * "nested" domain function
-  * "Loc" domain
+  * "PredicateInstance" domain
   */
-trait LocManager extends CheckProgramManager {
+trait PredicateInstanceManager extends CheckProgramManager {
 
   val nestedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("nested")
-  val locationDomain: Option[Domain] =  program.domains.find(_.name == "Loc") // findDomainOptionally()?
+  val PredicateInstanceDomain: Option[Domain] =  program.domains.find(_.name == "PredicateInstance") // findDomainOptionally()?
 
   private val createdLocFunctions: collection.mutable.ListMap[String, Function] = collection.mutable.ListMap[String, Function]()
 
@@ -28,7 +28,7 @@ trait LocManager extends CheckProgramManager {
     */
   def transformUnfold(pap: PredicateAccessPredicate): Stmt = {
 
-    if (locationDomain.isDefined && nestedFunc.isDefined) {
+    if (PredicateInstanceDomain.isDefined && nestedFunc.isDefined) {
       // assign variable to "predicate" before unfold
       val varP = uniquePredLocVar(pap.loc)
       val assignP = generatePredicateAssign(varP.localVar, pap.loc)
@@ -39,13 +39,13 @@ trait LocManager extends CheckProgramManager {
         val pred = program.findPredicate(pap.loc.predicateName)
         pred.body match {
           case Some(body) =>
-            if (locationDomain.isDefined && nestedFunc.isDefined) {
+            if (PredicateInstanceDomain.isDefined && nestedFunc.isDefined) {
               val formalArgs = ListMap(pred.formalArgs.map(_.localVar).zip(pap.loc.args): _*)
               //Generate nested-assumption
               transformPredicateBody(body.replace(formalArgs), varP, pap.perm)
             } else {
               // at least one of Loc domain or nested function is not defined
-              if (locationDomain.isEmpty) {
+              if (PredicateInstanceDomain.isEmpty) {
                 reportLocNotDefined(pap.pos)
               }
               if (nestedFunc.isEmpty) {
@@ -60,7 +60,7 @@ trait LocManager extends CheckProgramManager {
 
     } else {
       // at least one of Loc domain or nested function is not defined
-      if (locationDomain.isEmpty) {
+      if (PredicateInstanceDomain.isEmpty) {
         reportLocNotDefined(pap.pos)
       }
       if (nestedFunc.isEmpty) {
@@ -86,7 +86,7 @@ trait LocManager extends CheckProgramManager {
       case ap: AccessPredicate => ap match {
         case FieldAccessPredicate(_, _) => EmptyStmt
         case calledPred: PredicateAccessPredicate =>
-          assert(locationDomain.isDefined)
+          assert(PredicateInstanceDomain.isDefined)
           assert(nestedFunc.isDefined)
 
           //local variables
@@ -99,7 +99,7 @@ trait LocManager extends CheckProgramManager {
           //inhale nested-relation
           val params: Seq[TypeVar] = program.findDomain(nestedFunc.get.domainName).typVars
           val types: Seq[Type] =
-            Seq(DomainType(locationDomain.get, ListMap()), DomainType(locationDomain.get, ListMap()), Int)
+            Seq(DomainType(PredicateInstanceDomain.get, ListMap()), DomainType(PredicateInstanceDomain.get, ListMap()), Int)
 
           val mapNested: ListMap[TypeVar, Type] = ListMap(params.zip(types):_*)
           val inhale = Inhale(DomainFuncApp(nestedFunc.get,
@@ -170,12 +170,12 @@ trait LocManager extends CheckProgramManager {
     * @return a local variable with the correct type
     */
   def uniquePredLocVar(p: PredicateAccess): LocalVarDecl = {
-    assert(locationDomain.isDefined)
+    assert(PredicateInstanceDomain.isDefined)
     val predName = p.predicateName + "_" + p.args.hashCode().toString.replaceAll("-", "_")
     val predVarName = uniqueLocalVar(predName)
     val info = SimpleInfo(Seq(p.predicateName + "_" + p.args.mkString(",")))
     val newLocalVar =
-      LocalVarDecl(predVarName, DomainType(locationDomain.get,
+      LocalVarDecl(predVarName, DomainType(PredicateInstanceDomain.get,
         ListMap()))(info = info)
     newLocalVar
   }
@@ -186,7 +186,7 @@ trait LocManager extends CheckProgramManager {
     * @return function
     */
   private def getLocFunction(pap: Predicate): Function = {
-    assert(locationDomain.isDefined)
+    assert(PredicateInstanceDomain.isDefined)
 
     if (createdLocFunctions.contains(pap.name)) {
       createdLocFunctions(pap.name)
@@ -197,11 +197,11 @@ trait LocManager extends CheckProgramManager {
       val newLocFunc =
         Function(uniquePredFuncName,
           pred.formalArgs,
-          DomainType(locationDomain.get, ListMap()),
+          DomainType(PredicateInstanceDomain.get, ListMap()),
           Seq(PredicateAccessPredicate(PredicateAccess(pred.formalArgs.map(_.localVar), pred.name)(), WildcardPerm()())(pap.pos, pap.info, pap.errT)),
           Seq(),
           None
-        )(locationDomain.get.pos, locationDomain.get.info)
+        )(PredicateInstanceDomain.get.pos, PredicateInstanceDomain.get.info)
 
       createdLocFunctions(pap.name) = newLocFunc
       functions(uniquePredFuncName) = newLocFunc
