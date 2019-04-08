@@ -31,7 +31,7 @@ trait PredicateInstanceManager extends ProgramManager {
 
     if (PredicateInstanceDomain.isDefined && nestedFunc.isDefined) {
       // assign variable to "predicate" before unfold
-      val varP = uniquePredLocVar(pap.loc)
+      val varP = uniquePredicateInstanceVar(pap.loc)
       val assignP = generatePredicateAssign(varP.localVar, pap.loc)
 
       val unfold = Unfold(pap)()
@@ -47,7 +47,7 @@ trait PredicateInstanceManager extends ProgramManager {
             } else {
               // at least one of Loc domain or nested function is not defined
               if (PredicateInstanceDomain.isEmpty) {
-                reportLocNotDefined(pap.pos)
+                reportPredicateInstanceNotDefined(pap.pos)
               }
               if (nestedFunc.isEmpty) {
                 reportNestedNotDefined(pap.pos)
@@ -62,7 +62,7 @@ trait PredicateInstanceManager extends ProgramManager {
     } else {
       // at least one of Loc domain or nested function is not defined
       if (PredicateInstanceDomain.isEmpty) {
-        reportLocNotDefined(pap.pos)
+        reportPredicateInstanceNotDefined(pap.pos)
       }
       if (nestedFunc.isEmpty) {
         reportNestedNotDefined(pap.pos)
@@ -91,7 +91,7 @@ trait PredicateInstanceManager extends ProgramManager {
 
           //local variables
           val varOfCallerPred: LocalVarDecl = unfoldedPredVar
-          val varOfCalleePred: LocalVarDecl = uniquePredLocVar(calledPred.loc)
+          val varOfCalleePred: LocalVarDecl = uniquePredicateInstanceVar(calledPred.loc)
 
           //assignment
           val assign = generatePredicateAssign(varOfCalleePred.localVar, calledPred.loc)
@@ -136,7 +136,7 @@ trait PredicateInstanceManager extends ProgramManager {
     */
   def generatePredicateAssign(assLocation: LocalVar, pred: PredicateAccess)
                               : LocalVarAssign = {
-    val locFunc = getLocFunction(pred.loc(program))
+    val locFunc = getPredicateInstanceFunction(pred.loc(program))
     val assValue = FuncApp(locFunc, pred.args)()
     LocalVarAssign(assLocation, assValue)(pred.pos)
   }
@@ -145,7 +145,7 @@ trait PredicateInstanceManager extends ProgramManager {
     * All needed init predicate local variables.
     * (Predicate variables which should be declared and defined at the beginning of the method)
     */
-  private val initPredLocVar: scala.collection.mutable.Map[String, scala.collection.mutable.Map[PredicateAccessPredicate, LocalVarDecl]] = scala.collection.mutable.Map()
+  private val initPredicateInstanceVar: scala.collection.mutable.Map[String, scala.collection.mutable.Map[PredicateAccessPredicate, LocalVarDecl]] = scala.collection.mutable.Map()
 
   /**
     * Creates a unique init predicate local variable for this predicate for the method.
@@ -153,14 +153,14 @@ trait PredicateInstanceManager extends ProgramManager {
     * @param p the predicate which has to be represented by the variable
     * @return unique init predicate variable for the method
     */
-  def getInitPredLocVar(method: String, p: PredicateAccessPredicate): LocalVarDecl =
-    initPredLocVar.getOrElseUpdate(method, scala.collection.mutable.Map()).getOrElseUpdate(p, uniquePredLocVar(p.loc))
+  def getInitPredicateInstanceVar(method: String, p: PredicateAccessPredicate): LocalVarDecl =
+    initPredicateInstanceVar.getOrElseUpdate(method, scala.collection.mutable.Map()).getOrElseUpdate(p, uniquePredicateInstanceVar(p.loc))
 
   /**
     * @param method name
     * @return all needed init predicate local variables of the method
     */
-  def getMethodsInitPredLocVar(method: String): Map[PredicateAccessPredicate, LocalVarDecl] = initPredLocVar.getOrElse(method, Map.empty).toMap
+  def getMethodsInitPredicateInstanceVar(method: String): Map[PredicateAccessPredicate, LocalVarDecl] = initPredicateInstanceVar.getOrElse(method, Map.empty).toMap
 
   /**
     * Generator of the predicate-variables, which represents the type 'predicate'.
@@ -169,7 +169,7 @@ trait PredicateInstanceManager extends ProgramManager {
     * @param p predicate which defines the type of the variable
     * @return a local variable with the correct type
     */
-  def uniquePredLocVar(p: PredicateAccess): LocalVarDecl = {
+  def uniquePredicateInstanceVar(p: PredicateAccess): LocalVarDecl = {
     assert(PredicateInstanceDomain.isDefined)
     val predName = p.predicateName + "_" + p.args.hashCode().toString.replaceAll("-", "_")
     val predVarName = uniqueLocalVar(predName)
@@ -185,14 +185,14 @@ trait PredicateInstanceManager extends ProgramManager {
     * @param pap predicate
     * @return function
     */
-  private def getLocFunction(pap: Predicate): Function = {
+  private def getPredicateInstanceFunction(pap: Predicate): Function = {
     assert(PredicateInstanceDomain.isDefined)
 
     if (createdLocFunctions.contains(pap.name)) {
       createdLocFunctions(pap.name)
     } else {
       val uniquePredFuncName =
-        uniqueName("loc_" + pap.name)
+        uniqueName("pred_" + pap.name)
       val pred = program.findPredicate(pap.name)
       val newLocFunc =
         Function(uniquePredFuncName,
@@ -209,17 +209,17 @@ trait PredicateInstanceManager extends ProgramManager {
     }
   }
 
-  private val usedPredVariables: collection.mutable.Set[String] = collection.mutable.Set[String]()
+  private val usedPredicateInstanceVariables: collection.mutable.Set[String] = collection.mutable.Set[String]()
 
   //TODO: assumed that pred variable names are alone in the proof method.
   private def uniqueLocalVar(name: String): String = {
     var i = 0
     var newName = name
-    while(usedPredVariables.contains(newName)){
+    while(usedPredicateInstanceVariables.contains(newName)){
       newName = name + i
       i += 1
     }
-    usedPredVariables.add(newName)
+    usedPredicateInstanceVariables.add(newName)
     newName
   }
 
@@ -227,8 +227,8 @@ trait PredicateInstanceManager extends ProgramManager {
     reportError(ConsistencyError("Nested function is needed but not defined.", pos))
   }
 
-  def reportLocNotDefined(pos: Position): Unit = {
-    reportError(ConsistencyError("Loc domain is needed but not defined.", pos))
+  def reportPredicateInstanceNotDefined(pos: Position): Unit = {
+    reportError(ConsistencyError("PredicateInstance domain is needed but not defined.", pos))
   }
 }
 

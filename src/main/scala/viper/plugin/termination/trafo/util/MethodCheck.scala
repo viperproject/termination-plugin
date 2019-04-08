@@ -57,7 +57,7 @@ trait MethodCheck extends ProgramManager with DecreasesCheck with PredicateInsta
       val body: Stmt = methodStrategy(context).execute(m.body.get)
 
       // get all predicate init values which are used.
-      val newVarPred = getMethodsInitPredLocVar(m.name)
+      val newVarPred = getMethodsInitPredicateInstanceVar(m.name)
       val newVarPredAss: Seq[Stmt] = newVarPred.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
 
       val methodBody: Seqn = Seqn(newVarPredAss :+ body, newVarPred.values.toIndexedSeq)()

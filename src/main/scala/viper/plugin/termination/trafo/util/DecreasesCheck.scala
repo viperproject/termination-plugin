@@ -53,10 +53,10 @@ trait DecreasesCheck extends ProgramManager with PredicateInstanceManager {
             case pa: PredicateAccessPredicate =>
               if (PredicateInstanceDomain.isDefined) {
                 // use the init predicate variable
-                val varOfCalleePred = getInitPredLocVar(context.methodName, pa)
+                val varOfCalleePred = getInitPredicateInstanceVar(context.methodName, pa)
                 varOfCalleePred.localVar
               } else {
-                reportLocNotDefined(biggerDec.pos)
+                reportPredicateInstanceNotDefined(biggerDec.pos)
                 pa
               }
             case default => default
@@ -67,11 +67,11 @@ trait DecreasesCheck extends ProgramManager with PredicateInstanceManager {
           val checkableSmallerExp = sExp.map({
             case pa: PredicateAccessPredicate =>
               if (PredicateInstanceDomain.isDefined) {
-                val varOfCalleePred = uniquePredLocVar(pa.loc)
+                val varOfCalleePred = uniquePredicateInstanceVar(pa.loc)
                 newVarPred(pa) = varOfCalleePred
                 varOfCalleePred.localVar
               } else {
-                reportLocNotDefined(biggerDec.pos)
+                reportPredicateInstanceNotDefined(biggerDec.pos)
                 pa
               }
             case default => default

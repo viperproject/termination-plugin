@@ -38,7 +38,7 @@ trait FunctionCheck extends ProgramManager with DecreasesCheck with ExpTransform
       val checkBody = transformExp(f.body.get, contextBody)
 
       // get all predicate init values which are used.
-      val newVarBody = getMethodsInitPredLocVar(checkMethodNameBody)
+      val newVarBody = getMethodsInitPredicateInstanceVar(checkMethodNameBody)
       val newVarAssBody: Seq[Stmt] = newVarBody.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
 
       val checkMethodBody = Method(checkMethodNameBody, f.formalArgs, Nil, f.pres, Nil,
@@ -64,7 +64,7 @@ trait FunctionCheck extends ProgramManager with DecreasesCheck with ExpTransform
       })
 
       // get all predicate init values which are used.
-      val newVarPosts = getMethodsInitPredLocVar(checkMethodNamePosts)
+      val newVarPosts = getMethodsInitPredicateInstanceVar(checkMethodNamePosts)
       val newVarAssPosts: Seq[Stmt] = newVarPosts.map(v => generatePredicateAssign(v._2.localVar, v._1.loc)).toSeq
 
       val checkMethodPosts = Method(checkMethodNamePosts, f.formalArgs, Seq(resultVariable), f.pres, Nil,
