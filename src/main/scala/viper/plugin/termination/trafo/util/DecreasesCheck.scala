@@ -33,10 +33,13 @@ trait DecreasesCheck extends CheckProgramManager with PredicateInstanceManager {
   def createTerminationCheck(biggerDec: DecreasesExp, smallerDec: DecreasesExp, argMap: Map[LocalVar, Node],
                              errTrafo: ErrTrafo, reasonTrafoFactory: ReasonTrafoFactory, context: ProofMethodContext): Stmt = {
     (biggerDec, smallerDec) match {
-      case (DecreasesTuple(_,_,_), DecreasesStar(_,_)) =>
+      case (dt: DecreasesTuple, ds: DecreasesStar) =>
         val reTStar = reasonTrafoFactory.createStar(context)
         Assert(FalseLit()(errT = reTStar))(errT = errTrafo)
-      case (DecreasesTuple(biggerExp,_,_), DecreasesTuple(smallerExp,_,_)) =>
+      case (dtBig: DecreasesTuple, dtSmall: DecreasesTuple) =>
+        val biggerExp: Seq[Exp] = dtBig.subExps
+        val smallerExp: Seq[Exp] = dtSmall.subExps
+
         // decreasing and bounded functions are needed
         if(decreasingFunc.isDefined && boundedFunc.isDefined) {
           // trims to the longest commonly typed prefix

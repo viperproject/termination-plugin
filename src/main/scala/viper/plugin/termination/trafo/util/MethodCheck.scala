@@ -41,9 +41,9 @@ trait MethodCheck extends CheckProgramManager with DecreasesCheck with Predicate
   def getMethodDecreasesExp(method: String): DecreasesExp = methodsDec.getOrElse(method, {
     val m = methods.get(method)
     if(m.isDefined) {
-      DecreasesTuple(m.get.formalArgs.map(_.localVar), m.get.pos, NodeTrafo(m.get))
+      DecreasesTuple(m.get.formalArgs.map(_.localVar))(m.get.pos, NoInfo, NodeTrafo(m.get))
     }else{
-      DecreasesTuple()
+      DecreasesTuple()()
     }
   })
 

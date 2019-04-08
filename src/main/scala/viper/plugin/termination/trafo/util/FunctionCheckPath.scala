@@ -24,7 +24,7 @@ trait FunctionCheckPath extends CheckProgramManager with DecreasesCheck with Fun
     */
   def getFunctionDecreasesExp(function: Function): DecreasesExp = {
     functionsDec.getOrElse(function, {
-      DecreasesTuple(function.formalArgs.map(_.localVar), function.pos, NodeTrafo(function))
+      DecreasesTuple(function.formalArgs.map(_.localVar))(pos = function.pos, errT = NodeTrafo(function))
     })
   }
   val functionsDec: Map[Function, DecreasesExp]

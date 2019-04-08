@@ -241,7 +241,7 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
     def createDecreasesExp(exp: Exp): Exp = exp match {
       case c: Call if c.callee.equals(decStarFunc) =>
         // replace all decreasesStar functions with DecreasesStar
-        DecreasesStar(c.pos, NodeTrafo(c))
+        DecreasesStar()(pos = c.pos, errT = NodeTrafo(c))
       case c: Call if decNFuncInverted.contains(c.callee) =>
         // replace all decreasesN functions with DecreasesTuple
         assert(c.args.size == decNFuncInverted(c.callee))
@@ -254,7 +254,7 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
             PredicateAccessPredicate(pa, perm = p.args.last)(p.pos, p.info, p.errT)
           case default => default
         }
-        DecreasesTuple(newArgs, c.pos, NodeTrafo(c))
+        DecreasesTuple(newArgs)(pos = c.pos, errT = NodeTrafo(c))
       case p => p
     }
 
