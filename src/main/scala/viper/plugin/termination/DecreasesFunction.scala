@@ -9,7 +9,7 @@ import viper.plugin.termination.trafo.util.FunctionCheck
   * Adds termination checks to functions.
   * run --plugin viper.termination.DecreasesFunction [file]
   */
-class DecreasesFunction extends DecreasesPlugin {
+class DecreasesFunction extends AbstractDecreasesPlugin {
   override def transformToCheckProgram(input: Program, functionDecreasesMap: Map[ast.Function, DecreasesExp], methodDecreasesMap: Map[String, DecreasesExp]): Program = {
     val termCheck = new Trafo(input, reportError) with FunctionCheck {
       override val functionsDec: Map[ast.Function, DecreasesExp] = functionDecreasesMap

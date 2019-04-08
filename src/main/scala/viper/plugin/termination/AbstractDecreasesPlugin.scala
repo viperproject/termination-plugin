@@ -17,7 +17,7 @@ import viper.silver.verifier.{ConsistencyError, Failure, Success, VerificationRe
   *
   * (beforeVerify): Extract DecreasesExp from the program and call transformToCheckProgram.
   */
-trait DecreasesPlugin extends SilverPlugin {
+trait AbstractDecreasesPlugin extends SilverPlugin {
 
   // decreases keywords
   private val DECREASES = "decreases"

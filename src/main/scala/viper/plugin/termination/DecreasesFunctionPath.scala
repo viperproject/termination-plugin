@@ -10,7 +10,7 @@ import viper.plugin.termination.trafo.util.{FunctionCheckPath, MethodCheck}
   * (Follows execution path until a loop is reached)
   * run --plugin viper.termination.DecreasesFunctionPath [file]
   */
-class DecreasesFunctionPath extends DecreasesPlugin {
+class DecreasesFunctionPath extends AbstractDecreasesPlugin {
   override def transformToCheckProgram(input: Program, functionDecreasesMap: Map[ast.Function, DecreasesExp], methodDecreasesMap: Map[String, DecreasesExp]): Program = {
     val termCheck = new Trafo(input, reportError) with FunctionCheckPath{
       override val functionsDec: Map[ast.Function, DecreasesExp] = functionDecreasesMap
