@@ -10,5 +10,5 @@ import viper.silicon.tests.SiliconTests
 
 class DecreasesFunctionTests extends SiliconTests {
   override val testDirectories: Seq[String] = Seq("termination/functions/decreases", "termination/functions/decreases_simple")
-  override val commandLineArguments: Seq[String] = Seq("--plugin", "viper.termination.DecreasesFunction")
+  override val commandLineArguments: Seq[String] = Seq("--plugin", "viper.plugin.termination.DecreasesFunction")
 }
