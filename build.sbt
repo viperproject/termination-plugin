@@ -15,8 +15,8 @@ lazy val term = (project in file("."))
     version := "0.1",
     scalaVersion := "2.12.8",
 
-      // Test settings
-      Test / parallelExecution := false,
+    // Test settings
+    Test / parallelExecution := true,
 
     // Assembly settings
     assembly / assemblyJarName := "termination.jar",
