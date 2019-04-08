@@ -6,8 +6,8 @@ import viper.silver.verifier.AbstractError
 import scala.collection.mutable
 
 /**
-  * An interface to transform a program.
-  * (contains utility functions to avoid name conflicts)
+  * An interface to transform a program (e.g. a program including check methods).
+  * Contains utility functions to avoid name conflicts (e.g. when adding a new domain)
   */
 trait ProgramManager{
 
