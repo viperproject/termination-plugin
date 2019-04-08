@@ -14,7 +14,7 @@ $ ln -s ../silicon silicon
 ```
 
 ### Usage
-To use the plugin it has to be on the Java classpath. When invoking the back end `--plugin viper.plugin.<plugin name>` has to be specified.
+To use the plugin it has to be on the Java classpath. When invoking the back end `--plugin viper.plugin.termination.<plugin name>` has to be specified.
 
 | Plugin Name | Tests |
 | ------ | ------ |

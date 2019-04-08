@@ -11,7 +11,7 @@ import scala.collection.immutable.ListMap
 /**
   * Creates termination checks for methods.
   */
-trait MethodCheck extends CheckProgramManager with DecreasesCheck with PredicateInstanceManager{
+trait MethodCheck extends ProgramManager with DecreasesCheck with PredicateInstanceManager{
 
   /**
     * Checks if two methods call each other recursively (also indirect) (same cluster)
@@ -22,11 +22,7 @@ trait MethodCheck extends CheckProgramManager with DecreasesCheck with Predicate
   def sameCluster(m1: String, m2: String): Boolean = {
     val method1 = methods.get(m1)
     val method2 = methods.get(m2)
-    if (method1.isDefined && method2.isDefined){
-      Methods.getMethodCluster(method1.get, program).contains(method2.get)
-    }else{
-      false
-    }
+    method1.isDefined && method2.isDefined && Methods.getMethodCluster(method1.get, program).contains(method2.get)
   }
 
   /**
@@ -43,6 +39,7 @@ trait MethodCheck extends CheckProgramManager with DecreasesCheck with Predicate
     if(m.isDefined) {
       DecreasesTuple(m.get.formalArgs.map(_.localVar))(m.get.pos, NoInfo, NodeTrafo(m.get))
     }else{
+      assert(assertion = false, "Requested DecreasesExp of non existing method!")
       DecreasesTuple()()
     }
   })
@@ -101,7 +98,7 @@ trait MethodCheck extends CheckProgramManager with DecreasesCheck with Predicate
       val assertion = terminationCheck
 
       Seqn(Seq(assertion, mc), Nil)(mc.pos, NoInfo, NodeTrafo(mc))
-    case (u: Unfold, c: ProofMethodContext) => transformUnfold(u.acc)
+    case (u: Unfold, c: ProofMethodContext) => generateUnfoldNested(u.acc)
   }
 
   case class MContext(override val methodName: String) extends ProofMethodContext

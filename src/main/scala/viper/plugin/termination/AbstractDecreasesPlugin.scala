@@ -1,7 +1,7 @@
 
 package viper.plugin.termination
 
-import viper.silver.ast._
+import viper.silver.ast.{Assert, Call, Exp, Method, NodeTrafo, PredicateAccess, PredicateAccessPredicate, Program, Function}
 import viper.silver.ast.utility.{Functions, ViperStrategy}
 import viper.silver.parser._
 import viper.silver.plugin.SilverPlugin
@@ -44,25 +44,25 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
       * Perform the described replacements.
       */
     def fixPDecreasesClauses(exp: PExp): PExp = exp match {
-      case call: PCall if call.opName.equals(DECREASES)=>
+      case call: PCall if call.opName == DECREASES =>
         // replace decreases call
         val functionName = getDecreasesNFunction(call.args.length)
         // replace predicates
         val newArgs = call.args.map {
-          case predicateCall: PCall if input.predicates.exists(_.idndef.name.equals(predicateCall.idnuse.name)) =>
+          case predicateCall: PCall if input.predicates.exists(_.idndef.name == predicateCall.idnuse.name) =>
             // a predicate with the same name exists
             fixAccessPredicate(predicateCall)
-          case pap: PAccPred if input.predicates.exists(_.idndef.name.equals(pap.loc.idnuse.name)) =>
+          case pap: PAccPred if input.predicates.exists(_.idndef.name == pap.loc.idnuse.name) =>
             // a predicate with the same name exists
             fixAccessPredicate(pap.loc, pap.perm)
           case default => default
         }
         call.copy(func = PIdnUse(functionName), args = newArgs).setPos(call)
-      case call: PCall if call.opName.equals(DECREASESSTAR) =>
+      case call: PCall if call.opName == DECREASESSTAR =>
         // replace decreasesStar call
         // number of arguments is checked by the type checker.
         call.copy(func = PIdnUse(getDecreasesStarFunction)).setPos(call)
-      case d => d
+      case default => default
     }
 
     /**
@@ -97,9 +97,8 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
     })
 
     // all domains including the new helper domain
-    val domains = input.domains :+ {
+    val domains = input.domains :+
       createHelperDomain(getHelperDomain, getDecreasesStarFunction, decreasesNFunctions.toMap, predicateFunctions.toMap)
-    }
 
     input.copy(functions = functions, methods = methods, domains = domains).setPos(input)
   }
@@ -107,7 +106,7 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
   /**
     * @return unique name for the decreasesStar function
     */
-  private def getDecreasesStarFunction: String = {
+  private val getDecreasesStarFunction: String = {
     "$decreasesStar"
   }
 
@@ -116,14 +115,14 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
     * (N -> decreasesNFunction name)
     * Must be invertible!
     */
-  private val decreasesNFunctions = collection.mutable.Map[Integer, String]()
+  private val decreasesNFunctions = collection.mutable.Map[Int, String]()
 
   /**
     * Adds a new function name to the decreasesNFunctions map if none exists for this many arguments.
     * @param argsSize: number of arguments needed
     * @return name of decreaseN function
     */
-  private def getDecreasesNFunction(argsSize: Integer): String = {
+  private def getDecreasesNFunction(argsSize: Int): String = {
     decreasesNFunctions.getOrElseUpdate(argsSize, s"$$decreases$argsSize")
   }
 
@@ -149,7 +148,7 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
   /**
     * @return unique name for the helper domain containing all the new functions
     */
-  private def getHelperDomain: String = {
+  private val getHelperDomain: String = {
     "$HelperDomain"
   }
 
@@ -162,7 +161,7 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
     * @return domain containing all the wanted functions.
     */
   private def createHelperDomain(name: String, decreasesStar: String,
-                                 decreasesN: Map[Integer, String],
+                                 decreasesN: Map[Int, String],
                                  predicates: Map[(String, Seq[PFormalArgDecl]), String]): PDomain = {
     val domainIdDef = PIdnDef(name)
     val domainIdUse = PIdnUse(name)
@@ -171,7 +170,7 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
     val decreasesStarFunction = PDomainFunction(PIdnDef(decreasesStar), Nil, PPrimitiv(TypeHelper.Bool.name), unique = false)(domainIdUse)
 
     // number of type parameters needed
-    val maxArgs: Integer = decreasesN.keySet match {
+    val maxArgs: Int = decreasesN.keySet match {
       case d if d.isEmpty => 0
       case d => d.max
     }
@@ -239,7 +238,7 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
       * Perform the described replacements.
       */
     def createDecreasesExp(exp: Exp): Exp = exp match {
-      case c: Call if c.callee.equals(decStarFunc) =>
+      case c: Call if c.callee == decStarFunc =>
         // replace all decreasesStar functions with DecreasesStar
         DecreasesStar()(pos = c.pos, errT = NodeTrafo(c))
       case c: Call if decNFuncInverted.contains(c.callee) =>
@@ -288,9 +287,7 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
   override def beforeVerify(input: Program): Program = {
     val errors = checkNoFunctionRecursesViaDecreasesClause(input) ++ checkNoMultipleDecreasesClause(input)
     if (errors.nonEmpty){
-      for (e <- errors) {
-        reportError(e)
-      }
+      errors.foreach(reportError)
       return input
     }
 
@@ -301,8 +298,7 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
     val functionDecreasesMap = extractedDecreasesExp._2
     val methodDecreasesMap = extractedDecreasesExp._3
 
-    val res = transformToCheckProgram(newProgram, functionDecreasesMap, methodDecreasesMap)
-    res
+    transformToCheckProgram(newProgram, functionDecreasesMap, methodDecreasesMap)
   }
 
 
@@ -333,7 +329,7 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
   def transformToCheckProgram(input: Program,
                               functionDecreasesMap: Map[Function, DecreasesExp] = Map.empty[Function, DecreasesExp],
                               methodDecreasesMap: Map[String, DecreasesExp] = Map.empty[String, DecreasesExp])
-      : Program
+                              : Program
 
   /**
     * Checks if a function is defined recursively via its decrease clause (DecreasesExp in postconditions),
@@ -392,9 +388,7 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
 
     val result: Program = ViperStrategy.Slim({
       case f: Function =>
-        val partition = f.posts.partition(p => p.isInstanceOf[DecreasesExp])
-        val decreases = partition._1
-        val posts = partition._2
+        val (decreases, posts) = f.posts.partition(p => p.isInstanceOf[DecreasesExp])
 
         if (decreases.nonEmpty) {
           // one DecreasesExp found
@@ -410,9 +404,7 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
           f
         }
       case m: Method =>
-        val partition = m.posts.partition(p => p.isInstanceOf[DecreasesExp])
-        val decreases = partition._1
-        val posts = partition._2
+        val (decreases, posts) = m.posts.partition(p => p.isInstanceOf[DecreasesExp])
 
         if (decreases.nonEmpty) {
           // one DecreasesExp found

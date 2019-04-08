@@ -9,11 +9,11 @@ import viper.plugin.termination.{DecreasesExp, DecreasesStar, DecreasesTuple}
 
 import scala.collection.immutable.ListMap
 
-trait FunctionCheckPath extends CheckProgramManager with DecreasesCheck with FunctionTransformer {
+trait FunctionCheckPath extends ProgramManager with DecreasesCheck with ExpTransformer {
 
   private val heights: Map[Function, Int] = Functions.heights(program)
   private def compareHeights(f1: Function, f2: Function): Boolean = {
-    // guess heights are always positive
+    // assuming heights (as computed by Function.heights(program))are always non-negative
     heights.getOrElse(f1, -1) == heights.getOrElse(f2, -2)
   }
 
@@ -42,7 +42,7 @@ trait FunctionCheckPath extends CheckProgramManager with DecreasesCheck with Fun
       val checkMethodNameBody = uniqueName(f.name + "_termination_proof")
       val contextBody = FContext(f, checkMethodNameBody, Nil, Set.empty + f.name)
 
-      val checkBody = transformFuncBody(f.body.get, contextBody)
+      val checkBody = transformExp(f.body.get, contextBody)
 
       // get all predicate init values which are used.
       val newVarBody = getMethodsInitPredLocVar(checkMethodNameBody)
@@ -67,7 +67,7 @@ trait FunctionCheckPath extends CheckProgramManager with DecreasesCheck with Fun
 
       // after the termination checks assume the postcondition.
       val checkPosts = posts.map(p => {
-        Seqn(Seq(transformFuncBody(p, contextPosts), Inhale(p)(p.pos, p.info, p.errT)), Nil)()
+        Seqn(Seq(transformExp(p, contextPosts), Inhale(p)(p.pos, p.info, p.errT)), Nil)()
       })
 
       // get all predicate init values which are used.
@@ -89,7 +89,7 @@ trait FunctionCheckPath extends CheckProgramManager with DecreasesCheck with Fun
     * Then checks if the termination measure decreased     *
     * @return a statement containing all the inlining and the termination checks
     */
-  override def transformFuncBody: PartialFunction[(Exp, Context), Stmt] = {
+  override def transformExp: PartialFunction[(Exp, Context), Stmt] = {
     case (callee: FuncApp, c: Context) =>
       // need Path context
       assert(c.isInstanceOf[PathContext], "Wrong context used for transformFuncBody")
@@ -100,11 +100,11 @@ trait FunctionCheckPath extends CheckProgramManager with DecreasesCheck with Fun
       val stmts = collection.mutable.ArrayBuffer[Stmt]()
 
       // check the arguments
-      val termChecksOfArgs: Seq[Stmt] = callee.getArgs map (a => transformFuncBody(a, context))
+      val termChecksOfArgs: Seq[Stmt] = callee.getArgs map (a => transformExp(a, context))
       stmts.appendAll(termChecksOfArgs)
 
       val calledFunc = functions(callee.funcname)
-      val calleeArgs = callee.getArgs.map(transformExp(_, context))
+      val calleeArgs = callee.getArgs
 
       if (compareHeights(func, calledFunc)) {
         // In the same cycle
@@ -121,7 +121,7 @@ trait FunctionCheckPath extends CheckProgramManager with DecreasesCheck with Fun
             val body = calledFunc.body.get.replace(mapFormalArgsToCalledArgs)
             val newContext = context.copy(newFuncAppList, newAlreadyChecked)
 
-            val unrolled = transformFuncBody(body, newContext)
+            val unrolled = transformExp(body, newContext)
             stmts.append(unrolled)
 
           } else {
@@ -156,7 +156,7 @@ trait FunctionCheckPath extends CheckProgramManager with DecreasesCheck with Fun
       }
       Seqn(stmts, Nil)()
 
-    case default => super.transformFuncBody(default)
+    case default => super.transformExp(default)
   }
 
   case class FContext(override val func: Function,

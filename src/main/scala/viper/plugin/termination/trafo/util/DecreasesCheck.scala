@@ -14,7 +14,7 @@ import scala.collection.immutable.ListMap
   * "decreasing" domain function
   * "bounded" domain function
   */
-trait DecreasesCheck extends CheckProgramManager with PredicateInstanceManager {
+trait DecreasesCheck extends ProgramManager with PredicateInstanceManager {
 
   protected val decreasingFunc: Option[DomainFunc] = program.findDomainFunctionOptionally("decreasing")
   protected val boundedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("bounded")
@@ -59,7 +59,6 @@ trait DecreasesCheck extends CheckProgramManager with PredicateInstanceManager {
                 reportLocNotDefined(biggerDec.pos)
                 pa
               }
-            //case unfold: Unfolding => Old(unfold)(unfold.pos)
             case default => default
           })
 
@@ -103,12 +102,12 @@ trait DecreasesCheck extends CheckProgramManager with PredicateInstanceManager {
 
   /**
     * If expressions are not empty
-    * creates Expression to check decrease and bounded of lexicographical order.
+    * creates Expression to check decrease and bounded in lexicographical order.
     * The bigger expressions are all enclosed in old() expressions!
     * (decreasing(s,b) && bounded(b)) || (s==b && ( (decr...
-    * decreasing and bounded must be defined!
+    * decreasingFunc and boundedFunc have to be defined!
     * @param biggerExp [b,..] (can also be empty)
-    * @param smallerExp [s,..] same size as biggerExp
+    * @param smallerExp [s,..] same size as biggerExp!
     * @return expression or false if expression is empty
     */
   private def createTerminationCheckExp(biggerExp: Seq[Exp], smallerExp: Seq[Exp], decrReTrafo: ReTrafo, boundReTrafo: ReTrafo): Exp = {

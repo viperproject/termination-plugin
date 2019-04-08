@@ -6,10 +6,10 @@ import viper.silver.verifier.AbstractError
 import scala.collection.mutable
 
 /**
-  * An interface which offers to add additional code to a program
-  * without causing name conflicts.
+  * An interface to transform a program.
+  * (contains utility functions to avoid name conflicts)
   */
-trait CheckProgramManager{
+trait ProgramManager{
 
   // original program
   val program: Program

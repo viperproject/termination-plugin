@@ -18,13 +18,11 @@ object Methods {
     * TODO: Memoize invocations of `getFunctionCallgraph`.
     */
   def getMethodCallgraph(program: Program, subs: Method => Seq[Node] = _.body.getOrElse(Seq()).toSeq)
-  : DefaultDirectedGraph[Method, DefaultEdge] = {
+                        : DefaultDirectedGraph[Method, DefaultEdge] = {
 
     val graph = new DefaultDirectedGraph[Method, DefaultEdge](classOf[DefaultEdge])
 
-    for (m <- program.methods) {
-      graph.addVertex(m)
-    }
+    program.methods.foreach(graph.addVertex)
 
     def process(m: Method, n: Node) {
       n visit {

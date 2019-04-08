@@ -6,4 +6,4 @@ import viper.plugin.termination.trafo.util._
 
 class Trafo(override val program: Program,
             override val reportError: AbstractError => Unit)
-  extends CheckProgramManager
+  extends ProgramManager

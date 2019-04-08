@@ -14,7 +14,7 @@ import scala.collection.immutable.ListMap
   * "nested" domain function
   * "PredicateInstance" domain
   */
-trait PredicateInstanceManager extends CheckProgramManager {
+trait PredicateInstanceManager extends ProgramManager {
 
   val nestedFunc: Option[DomainFunc] =  program.findDomainFunctionOptionally("nested")
   val PredicateInstanceDomain: Option[Domain] =  program.domains.find(_.name == "PredicateInstance") // findDomainOptionally()?
@@ -22,11 +22,12 @@ trait PredicateInstanceManager extends CheckProgramManager {
   private val createdLocFunctions: collection.mutable.ListMap[String, Function] = collection.mutable.ListMap[String, Function]()
 
   /**
-    * Creates an Unfold with the given predicate access predicate and the nested relations.
+    * Generates an Unfold with the given predicate access predicate.
+    * Additionally adds the predicate instances and the nested relations.
     * @param pap the predicate access predicate
-    * @return Seqn(Unfold(pap), [Nested Stmts])
+    * @return Seqn(PredicateInstance p1, Unfold(pap), [PredicateInstance p2, Inhale(Nested(p2, p1))])
     */
-  def transformUnfold(pap: PredicateAccessPredicate): Stmt = {
+  def generateUnfoldNested(pap: PredicateAccessPredicate): Stmt = {
 
     if (PredicateInstanceDomain.isDefined && nestedFunc.isDefined) {
       // assign variable to "predicate" before unfold
@@ -75,9 +76,8 @@ trait PredicateInstanceManager extends CheckProgramManager {
   /**
     * Traverses a predicate body (once) and adds corresponding inhales of the 'nested'-Relation
     * iff a predicate is inside of this body.
-    * locationDomain and nestedFun must be defined!
-    *
-    * @param body     the part of the predicate-body which should be analyzed
+    * locationDomain and nestedFun have to be defined!
+    * @param body the part of the predicate-body which should be transform
     * @param unfoldedPredVar the body of the original predicate which should be analyzed
     * @return statements with the generated inhales: (Inhale(nested(pred1, pred2)))
     */
@@ -135,7 +135,7 @@ trait PredicateInstanceManager extends CheckProgramManager {
     * @return an assignment of the given variable to the representation of a predicate with the corresponding arguments
     */
   def generatePredicateAssign(assLocation: LocalVar, pred: PredicateAccess)
-  : LocalVarAssign = {
+                              : LocalVarAssign = {
     val locFunc = getLocFunction(pred.loc(program))
     val assValue = FuncApp(locFunc, pred.args)()
     LocalVarAssign(assLocation, assValue)(pred.pos)
