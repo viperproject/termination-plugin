@@ -1,4 +1,4 @@
-package viper.termination.trafo.util
+package viper.plugin.termination.trafo.util
 
 import viper.silver.ast._
 import viper.silver.verifier.AbstractError

@@ -1,9 +1,9 @@
-package viper.termination
+package viper.plugin.termination
 
 import viper.silver.ast
 import viper.silver.ast.Program
-import viper.termination.trafo.Trafo
-import viper.termination.trafo.util.FunctionCheck
+import viper.plugin.termination.trafo.Trafo
+import viper.plugin.termination.trafo.util.FunctionCheck
 
 /**
   * Adds termination checks to functions.

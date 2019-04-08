@@ -1,4 +1,4 @@
-package viper.termination.trafo.util
+package viper.plugin.termination.trafo.util
 
 import viper.silver.ast.utility.Statements.EmptyStmt
 import viper.silver.ast.{AccessPredicate, BinExp, CondExp, Domain, DomainFunc, DomainFuncApp, DomainType, Exp, FieldAccessPredicate, FuncApp, Function, If, Implies, Inhale, Int, LocalVar, LocalVarAssign, LocalVarDecl, MagicWand, Position, Predicate, PredicateAccess, PredicateAccessPredicate, Seqn, SimpleInfo, Stmt, Type, TypeVar, UnExp, Unfold, WildcardPerm}

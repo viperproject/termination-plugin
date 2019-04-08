@@ -1,9 +1,9 @@
-package viper.termination.trafo.util
+package viper.plugin.termination.trafo.util
 
 import viper.silver.ast._
 import viper.silver.verifier.reasons.{AssertionFalse, ErrorNode}
 import viper.silver.verifier.{AbstractErrorReason, AbstractVerificationError, ErrorReason, errors}
-import viper.termination.{DecreasesExp, DecreasesTuple}
+import viper.plugin.termination.{DecreasesExp, DecreasesTuple}
 
 /*
   All Errors and Reasons concerning termination checks and the Reason Factories.

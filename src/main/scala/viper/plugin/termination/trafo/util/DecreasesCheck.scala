@@ -1,9 +1,9 @@
-package viper.termination.trafo.util
+package viper.plugin.termination.trafo.util
 
 import viper.silver.ast.utility.Statements.EmptyStmt
 import viper.silver.ast._
 import viper.silver.verifier.ConsistencyError
-import viper.termination.{DecreasesExp, DecreasesStar, DecreasesTuple}
+import viper.plugin.termination.{DecreasesExp, DecreasesStar, DecreasesTuple}
 
 import scala.collection.immutable.ListMap
 

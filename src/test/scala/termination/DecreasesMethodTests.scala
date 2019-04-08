@@ -1,5 +1,5 @@
 
-package viper.termination
+package viper.plugin.termination
 
 import viper.silicon.tests.SiliconTests
 

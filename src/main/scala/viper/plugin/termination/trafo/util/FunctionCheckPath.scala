@@ -1,11 +1,11 @@
 
-package viper.termination.trafo.util
+package viper.plugin.termination.trafo.util
 
 import viper.silver.ast.utility.Rewriter.Traverse
 import viper.silver.ast.utility.{Functions, ViperStrategy}
 import viper.silver.ast.{ErrTrafo, Exp, FuncApp, Function, Inhale, LocalVar, LocalVarDecl, Method, NodeTrafo, Program, Result, Seqn, Stmt}
 import viper.silver.verifier.errors.AssertFailed
-import viper.termination.{DecreasesExp, DecreasesStar, DecreasesTuple}
+import viper.plugin.termination.{DecreasesExp, DecreasesStar, DecreasesTuple}
 
 import scala.collection.immutable.ListMap
 

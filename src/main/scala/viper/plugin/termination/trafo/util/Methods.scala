@@ -1,4 +1,4 @@
-package viper.termination.trafo.util
+package viper.plugin.termination.trafo.util
 
 import org.jgrapht.alg.cycle.CycleDetector
 import org.jgrapht.graph.{DefaultDirectedGraph, DefaultEdge}

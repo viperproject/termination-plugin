@@ -1,5 +1,5 @@
 
-package viper.termination
+package viper.plugin.termination
 
 import viper.silver.ast._
 import viper.silver.ast.utility.{Functions, ViperStrategy}
