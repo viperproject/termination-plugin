@@ -9,7 +9,7 @@ package viper.plugin.termination
 import viper.silver.ast
 import viper.silver.ast.Program
 import viper.plugin.termination.trafo.Trafo
-import viper.plugin.termination.trafo.util.{FunctionCheckPath, MethodCheck}
+import viper.plugin.termination.trafo.util.MethodCheck
 
 /**
   * Adds termination checks to methods.
