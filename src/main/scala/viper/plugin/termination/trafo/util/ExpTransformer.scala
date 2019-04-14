@@ -8,15 +8,19 @@ package viper.plugin.termination.trafo.util
 
 import viper.silver.ast._
 import viper.silver.ast.utility.Statements.EmptyStmt
+import viper.silver.verifier.ConsistencyError
 
 /**
   * A basic interface which helps to rewrite an expression (e.g. a function body) into a stmt (e.g. for a method body).
   * Some basic transformations are already implemented.
+  * If no transformation is defined for an expression a consistency error is reported (to avoid unsound results).
   */
 trait ExpTransformer extends PredicateInstanceManager {
 
   /**
     * Transforms an expression (e.g. function body) into a statement.
+    * If an unsupported expression is detected, i.e. an expression for which no transformation is defined,
+    * a consistency error is reported (to avoid unsound results).
     * Parts of the expressions which stay expressions (e.g. the condition in a if clause)
     * are also transformed into statements and prepended to the other statement.
     * @return a statement representing the expression
@@ -81,14 +85,33 @@ trait ExpTransformer extends PredicateInstanceManager {
           transformExp(elem, c)), Nil)(sq.pos)
       case SeqLength(s) =>
         Seqn(Seq(transformExp(s, c)), Nil)(sq.pos)
-      case _: Exp => EmptyStmt
+      case EmptySeq(e) => EmptyStmt
+
+      case unsupportedExp => reportUnsupportedExp(unsupportedExp)
+        EmptyStmt
     }
     case (st: ExplicitSet, c) =>
       Seqn(st.elems.map(transformExp(_, c)), Nil)(st.pos)
     case (mst: ExplicitMultiset, c) =>
       Seqn(mst.elems.map(transformExp(_, c)), Nil)(mst.pos)
     case (u: UnExp, c) => transformExp(u.exp, c)
-    case _ => EmptyStmt
+
+    case (l: Literal, c) => EmptyStmt
+    case (v: AbstractLocalVar, c) => EmptyStmt
+    case (dc: DomainFuncApp, c) => EmptyStmt
+    case (p: AbstractConcretePerm, c) => EmptyStmt
+    case (la: LocationAccess, c) => EmptyStmt
+
+    case (unsupportedExp, c) => reportUnsupportedExp(unsupportedExp)
+      EmptyStmt
+  }
+
+  /**
+    * Issues a consistency error for unsupported expressions.
+    * @param unsupportedExp to be reported.
+    */
+  def reportUnsupportedExp(unsupportedExp: Exp): Unit ={
+    reportError(ConsistencyError("Unsupported expression detected: " + unsupportedExp + ", " + unsupportedExp.getClass, unsupportedExp.pos))
   }
 
 }

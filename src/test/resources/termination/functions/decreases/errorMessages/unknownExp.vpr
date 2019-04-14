@@ -1,0 +1,10 @@
+// Any copyright is dedicated to the Public Domain.
+// http://creativecommons.org/publicdomain/zero/1.0/
+
+import <decreases/int_decreases.sil>
+
+function f(x: Int): Int
+{
+    //:: ExpectedOutput(consistency.error)
+    let y == (x-1) in y < 0 ? 0 : f(x-1)
+}
