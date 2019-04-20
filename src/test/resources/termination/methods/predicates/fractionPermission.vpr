@@ -10,7 +10,7 @@ predicate list(this: Ref) {
   (this.next != null ==> list(this.next))
 }
 
-// function does terminate!
+// method does terminate!
 method traverse(this: Ref)
     requires acc(list(this), 1/2)
     ensures acc(list(this), 1/2)

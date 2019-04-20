@@ -51,7 +51,7 @@ object Methods {
     */
   def getMethodCluster(m: Method, program: Program): Set[Method] = {
     val graph = getMethodCallgraph(program)
-    val cycleDetector = new CycleDetector[Method, DefaultEdge](graph)
+    val cycleDetector = new CycleDetector(graph)
     val cluster = cycleDetector.findCyclesContainingVertex(m).asScala
     cluster.add(m)
     cluster.toSet

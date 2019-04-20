@@ -26,8 +26,8 @@ trait MethodCheck extends ProgramManager with DecreasesCheck with PredicateInsta
     * @return true iff in same cluster
     */
   def sameCluster(m1: String, m2: String): Boolean = {
-    val method1 = methods.get(m1)
-    val method2 = methods.get(m2)
+    val method1 = program.methods.find(_.name == m1)
+    val method2 = program.methods.find(_.name == m2)
     method1.isDefined && method2.isDefined && Methods.getMethodCluster(method1.get, program).contains(method2.get)
   }
 
@@ -93,15 +93,13 @@ trait MethodCheck extends ProgramManager with DecreasesCheck with PredicateInsta
         "This should not happen!")
 
       val errTrafo = ErrTrafo({
-        case AssertFailed(_, r, c) => TerminationFailed(mc, r, c)
+        case AssertFailed(_, r, c) => MethodTerminationError(mc, r, c)
         case d => d
       })
 
       val reasonTrafoFactory = SimpleReasonTrafoFactory(decOrigin.asInstanceOf[DecreasesTuple])
 
-      val terminationCheck = createTerminationCheck(decOrigin, decDest, mapFormalArgsToCalledArgs, errTrafo, reasonTrafoFactory, context)
-
-      val assertion = terminationCheck
+      val assertion = createTerminationCheck(decOrigin, decDest, mapFormalArgsToCalledArgs, errTrafo, reasonTrafoFactory, context)
 
       Seqn(Seq(assertion, mc), Nil)(mc.pos, NoInfo, NodeTrafo(mc))
     case (u: Unfold, c: ProofMethodContext) => generateUnfoldNested(u.acc)

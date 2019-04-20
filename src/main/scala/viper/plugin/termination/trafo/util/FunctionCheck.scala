@@ -116,7 +116,7 @@ trait FunctionCheck extends ProgramManager with DecreasesCheck with ExpTransform
           "This should not happen!")
 
         val errTrafo = ErrTrafo({
-          case AssertFailed(_, r, c) => TerminationFailed(callee, r, c)
+          case AssertFailed(_, r, c) => FunctionTerminationError(callee, r, c)
           case d => d
         })
 

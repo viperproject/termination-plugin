@@ -16,3 +16,45 @@ method m(x: Int) returns (res:Int)
         res := 1 + r
     }
 }
+
+method mutual1(y: Int) returns (res: Int)
+    ensures decreases(y)
+{
+    if (y <= 0) {
+        res := 0
+    } else {
+        res := mutual2(y-1)
+    }
+}
+
+method mutual2(z: Int) returns (res: Int)
+    ensures decreases(z)
+{
+    if (z <= 0) {
+        res := 0
+    } else {
+        res := mutual1(z-1)
+    }
+}
+
+method non1(y: Int) returns (res: Int)
+    ensures decreases(y)
+{
+    if (y <= 0) {
+        res := 0
+    } else {
+        //:: ExpectedOutput(termination.failed:termination.no.decrease)
+        res := non2(y)
+    }
+}
+
+method non2(z: Int) returns (res: Int)
+    ensures decreases(z)
+{
+    if (z <= 0) {
+        res := 0
+    } else {
+        //:: ExpectedOutput(termination.failed:termination.no.decrease)
+        res := non1(z)
+    }
+}
