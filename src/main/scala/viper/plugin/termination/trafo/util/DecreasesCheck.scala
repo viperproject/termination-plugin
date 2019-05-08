@@ -100,7 +100,7 @@ trait DecreasesCheck extends ProgramManager with PredicateInstanceManager {
           EmptyStmt
         }
       case _ =>
-        assert(assertion = false, "Checking termination of something declared with DecreasesStar!" +
+        assert(assertion = false, "Checking termination of something declared with DecreasesStar! " +
           "This should not happen!")
         Assert(FalseLit()())(errT = errTrafo)
     }

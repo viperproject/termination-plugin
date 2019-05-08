@@ -140,11 +140,11 @@ trait FunctionCheckPath extends ProgramManager with DecreasesCheck with ExpTrans
           val decOrigin = getFunctionDecreasesExp(func)
           val decDest = getFunctionDecreasesExp(calledFunc)
 
-          assert(decOrigin.isInstanceOf[DecreasesTuple], "Checking a function with DecreasesStar for termination!" +
+          assert(decOrigin.isInstanceOf[DecreasesTuple], "Checking a function with DecreasesStar for termination! " +
             "This should not happen!")
 
           val errTrafo = ErrTrafo({
-            case AssertFailed(_, r, c) => FunctionTerminationError(newFuncAppList.head, r, c)
+            case AssertFailed(_, r, cached) => FunctionTerminationError(newFuncAppList.head, r, cached)
             case d => d
           })
 

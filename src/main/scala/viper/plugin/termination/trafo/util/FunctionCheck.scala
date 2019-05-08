@@ -112,7 +112,7 @@ trait FunctionCheck extends ProgramManager with DecreasesCheck with ExpTransform
         val decOrigin = getFunctionDecreasesExp(func)
         val decDest = getFunctionDecreasesExp(calledFunc)
 
-        assert(decOrigin.isInstanceOf[DecreasesTuple], "Checking a function with DecreasesStar for termination!" +
+        assert(decOrigin.isInstanceOf[DecreasesTuple], "Checking a function with DecreasesStar for termination! " +
           "This should not happen!")
 
         val errTrafo = ErrTrafo({

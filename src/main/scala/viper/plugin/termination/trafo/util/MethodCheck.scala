@@ -26,9 +26,9 @@ trait MethodCheck extends ProgramManager with DecreasesCheck with PredicateInsta
     * @return true iff in same cluster
     */
   def sameCluster(m1: String, m2: String): Boolean = {
-    val method1 = program.methods.find(_.name == m1)
-    val method2 = program.methods.find(_.name == m2)
-    method1.isDefined && method2.isDefined && Methods.getMethodCluster(method1.get, program).contains(method2.get)
+    val method1 = program.findMethod(m1)
+    val method2 = program.findMethod(m2)
+    Methods.getMethodCluster(method1, program).contains(method2)
   }
 
   /**
@@ -89,7 +89,7 @@ trait MethodCheck extends ProgramManager with DecreasesCheck with PredicateInsta
       val decOrigin = getMethodDecreasesExp(context.methodName)
       val decDest = getMethodDecreasesExp(mc.methodName)
 
-      assert(decOrigin.isInstanceOf[DecreasesTuple], "Checking a method with DecreasesStar for termination!" +
+      assert(decOrigin.isInstanceOf[DecreasesTuple], "Checking a method with DecreasesStar for termination! " +
         "This should not happen!")
 
       val errTrafo = ErrTrafo({

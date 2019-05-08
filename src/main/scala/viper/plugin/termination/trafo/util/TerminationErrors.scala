@@ -81,7 +81,7 @@ case class TerminationNoBound(offendingNode: DecreasesTuple, decExp: Seq[Exp]) e
 
 case class TerminationStar(offendingNode: DecreasesTuple) extends AbstractErrorReason {
   val id = "termination.star"
-  override def readableMessage = s"Cannot prove termination, if something declared with decreasesStar is called."
+  override def readableMessage = s"Cannot prove termination, if member declared with decreasesStar is called."
 
   def withNode(offendingNode: errors.ErrorNode = this.offendingNode) = TerminationStar(this.offendingNode)
 }
@@ -106,7 +106,7 @@ case class TerminationNoDecreasePath(offendingNode: DecreasesExp, decOrigin: Seq
   val id = "termination.no.decrease"
   override def readableMessage: String = s"Termination measure might not decrease. " +
     s"Assertion (${decDest.mkString(", ")})≺(${decOrigin.mkString(", ")}) might not hold. " +
-    s"Path: ${PathReasonPrinter.getReadablePath(offendingPath)}."
+    s"\nPath: ${PathReasonPrinter.getReadablePath(offendingPath)}."
 
   def withNode(offendingNode: errors.ErrorNode = this.offendingNode) = TerminationNoDecreasePath(this.offendingNode, decOrigin, decDest, offendingPath)
 }
@@ -115,15 +115,15 @@ case class TerminationNoBoundPath(offendingNode: DecreasesExp, decExp: Seq[Exp],
   val id = "termination.no.bound"
   override def readableMessage: String = s"Termination measure might not be bounded. " +
     s"Assertion 0≺(${decExp.mkString(", ")}) might not hold. " +
-    s"Path: ${PathReasonPrinter.getReadablePath(offendingPath)}."
+    s"\nPath: ${PathReasonPrinter.getReadablePath(offendingPath)}."
 
   def withNode(offendingNode: errors.ErrorNode = this.offendingNode) = TerminationNoBoundPath(this.offendingNode, decExp, offendingPath)
 }
 
 case class TerminationStarPath(offendingNode: DecreasesExp, offendingPath: Seq[FuncApp]) extends AbstractErrorReason {
   val id = "termination.star"
-  override def readableMessage = s"Cannot prove termination, if something with decreasesStar is called." +
-    s"Path: ${PathReasonPrinter.getReadablePath(offendingPath)}."
+  override def readableMessage: String = s"Cannot prove termination, if member with decreasesStar is called." +
+    s"\nPath: ${PathReasonPrinter.getReadablePath(offendingPath)}."
 
   def withNode(offendingNode: errors.ErrorNode = this.offendingNode) = TerminationStarPath(this.offendingNode, offendingPath)
 }
