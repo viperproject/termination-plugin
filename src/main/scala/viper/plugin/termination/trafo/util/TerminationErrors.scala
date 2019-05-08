@@ -122,7 +122,7 @@ case class TerminationNoBoundPath(offendingNode: DecreasesExp, decExp: Seq[Exp],
 
 case class TerminationStarPath(offendingNode: DecreasesExp, offendingPath: Seq[FuncApp]) extends AbstractErrorReason {
   val id = "termination.star"
-  override def readableMessage: String = s"Cannot prove termination, if member with decreasesStar is called." +
+  override def readableMessage: String = s"Cannot prove termination, if member declared with decreasesStar is called." +
     s"\nPath: ${PathReasonPrinter.getReadablePath(offendingPath)}."
 
   def withNode(offendingNode: errors.ErrorNode = this.offendingNode) = TerminationStarPath(this.offendingNode, offendingPath)
