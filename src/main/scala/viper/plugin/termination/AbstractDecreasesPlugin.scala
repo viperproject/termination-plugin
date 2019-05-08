@@ -348,10 +348,10 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
 
     var errors = Seq.empty[ConsistencyError]
     Functions.findFunctionCyclesVia(program, functionDecs) foreach { case (func, cycleSet) =>
-      var msg = s"Function ${func.name} recurses via its decreases clause"
+      var msg = s"Function ${func.name} recurses via its decreases clause.\n"
 
       if (cycleSet.nonEmpty) {
-        msg = s"$msg: the cycle contains the function(s) ${cycleSet.map(_.name).mkString(", ")}"
+        msg = s"$msg: The cycle contains the function(s) ${cycleSet.map(_.name).mkString(", ")}."
       }
       errors :+= ConsistencyError(msg, func.pos)
     }
