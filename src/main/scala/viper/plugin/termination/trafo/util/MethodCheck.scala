@@ -7,7 +7,7 @@
 package viper.plugin.termination.trafo.util
 
 import viper.silver.ast._
-import viper.silver.ast.utility.Rewriter.{ContextCustom, Strategy, Traverse}
+import viper.silver.ast.utility.rewriter.{ContextCustom, Strategy, Traverse}
 import viper.silver.ast.utility.ViperStrategy
 import viper.silver.verifier.errors.AssertFailed
 import viper.plugin.termination.{DecreasesExp, DecreasesStar, DecreasesTuple}
