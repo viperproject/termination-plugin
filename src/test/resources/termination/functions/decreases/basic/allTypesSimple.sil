@@ -6,14 +6,14 @@ import <decreases/importAllDec.sil>
 //Example decreasing Int
 function fact(x:Int): Int
 requires x>=0
-ensures decreases(x)
+decreases x
 {
     x==0 ? 1 : x*fact(x-1)
 }
 
 //Example decreasing Reference
 function references(r:Ref):Int
-ensures decreases(r)
+decreases r
 {
     r == null ? 1 : references(null)
 }
@@ -22,7 +22,7 @@ ensures decreases(r)
 //Example decreasing Booleans
 function booleans(b: Bool): Int
 ensures result == 1
-ensures decreases(b)
+decreases b
 {
     b ? 1 : booleans(true)
 }
@@ -31,7 +31,7 @@ ensures decreases(b)
 //Example decreasing Sequences (Integers)
 function numberOfElements(seq:Seq[Int]): Int
 ensures result == |seq|
-ensures decreases(seq)
+decreases seq
 {
     |seq| != 0? 1+numberOfElements(seq[1..]) : 0
 }
@@ -39,7 +39,7 @@ ensures decreases(seq)
 
 ////Example decreasing Sequences (Booleans)
 function numberOfUsers(seq:Seq[Bool]): Int
-ensures decreases(seq)
+decreases seq
 {
     |seq| == 0 ? 0 :
     //:: UnexpectedOutput(termination.failed:termination.no.decrease, /silicon/issue/300/)
@@ -48,14 +48,14 @@ ensures decreases(seq)
 
 //Example decreasing Set
 function sets(s:Set[Int]):Int
-ensures decreases(s)
+decreases s
 {
     |s|>0 && (|s| in s) ? sets(s setminus Set(|s|)) : 1
 }
 
 //Example decreasing MulitSet
 function multiSets(s: Multiset[Int]) : Int
-ensures decreases(s)
+decreases s
 {
     |s|>0 && (|s| in s) > 0 ? multiSets(s setminus Multiset(|s|)) : 1
 }

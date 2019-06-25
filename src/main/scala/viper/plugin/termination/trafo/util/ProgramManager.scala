@@ -92,6 +92,6 @@ trait ProgramManager{
       fields.values.toSeq,
       functions.values.toSeq,
       predicates.values.toSeq,
-      methods.values.toSeq)(program.pos, program.info, program.errT)
+      methods.values.toSeq, Seq())(program.pos, program.info, program.errT)
   }
 }

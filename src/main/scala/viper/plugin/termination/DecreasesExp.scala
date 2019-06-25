@@ -9,6 +9,7 @@ package viper.plugin.termination
 import viper.silver.ast._
 import viper.silver.ast.pretty.FastPrettyPrinter.{ContOps, char, parens, space, ssep, text, toParenDoc}
 import viper.silver.ast.pretty.PrettyPrintPrimitives
+import viper.silver.verifier.VerificationResult
 
 /**
   * Expression used to define the (possible) decreases clause (termination measure)
@@ -20,7 +21,7 @@ sealed trait DecreasesExp extends ExtensionExp with Node
   * @param extensionSubnodes Seq of expressions defining the termination measure (lex order)
   */
 case class DecreasesTuple(extensionSubnodes: Seq[Exp] = Nil)(override val pos: Position = NoPosition, override val info: Info = NoInfo, override val errT: ErrorTrafo = NoTrafos) extends DecreasesExp {
-
+  override def verifyExtExp(): VerificationResult = ???
   override val extensionIsPure = true
 
   override val typ: Type = Bool
@@ -35,7 +36,7 @@ case class DecreasesTuple(extensionSubnodes: Seq[Exp] = Nil)(override val pos: P
   * No termination checks are done.
   */
 case class DecreasesStar()(override val pos: Position = NoPosition, override val info: Info = NoInfo, override val errT: ErrorTrafo = NoTrafos) extends DecreasesExp{
-
+  override def verifyExtExp(): VerificationResult = ???
   override val extensionIsPure: Boolean = true
 
   override val extensionSubnodes: Seq[Node] = Nil

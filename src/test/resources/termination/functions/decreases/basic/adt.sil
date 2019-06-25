@@ -78,7 +78,7 @@ domain list {
 
 function f(xs:list) : Int
 requires size(xs)>=0
-ensures decreases(size(xs))
+decreases size(xs)
 {
     size(xs) > 0 ? f(tail_Cons(xs)) : 6
 }
