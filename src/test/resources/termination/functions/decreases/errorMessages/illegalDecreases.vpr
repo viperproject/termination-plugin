@@ -5,7 +5,7 @@ import <decreases/int_decreases.sil>
 
 function f(x: Int): Int
 //:: ExpectedOutput(typechecker.error)
-ensures decreases(m(x))
+decreasea m(x)
 {
   x == 0 ? 0 : f(x-1)
 }

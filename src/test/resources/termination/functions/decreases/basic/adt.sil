@@ -1,7 +1,22 @@
 // Any copyright is dedicated to the Public Domain.
 // http://creativecommons.org/publicdomain/zero/1.0/
 
-import <decreases/int_decreases.sil>
+domain TerminationOrder[T]{
+    function decreasing(arg1:T, arg2:T):Bool
+    function bounded(arg1:T):Bool
+}
+
+domain IntTerminationOrder{
+	//Integers
+    axiom integer_ax_dec{
+        forall int1: Int, int2: Int :: {decreasing(int1, int2)}
+            (int1 < int2) ==> decreasing(int1, int2)
+    }
+    axiom integer_ax_bound{
+        forall int1: Int :: {bounded(int1)}
+            int1 >= 0 ==> bounded(int1)
+    }
+}
 
 domain list {
 
@@ -78,7 +93,7 @@ domain list {
 
 function f(xs:list) : Int
 requires size(xs)>=0
-decreases size(xs)
+decreasea size(xs)
 {
     size(xs) > 0 ? f(tail_Cons(xs)) : 6
 }
