@@ -1,0 +1,28 @@
+// Any copyright is dedicated to the Public Domain.
+// http://creativecommons.org/publicdomain/zero/1.0/
+
+function f(x: Int): Int
+    requires x >= 0
+    //:: ExpectedOutput(consistency.error)
+    decreasea (x) // decreasing and bounded are not defined
+{
+    x == 0 ? 0 : f(x-1) + f(x)
+}
+
+field elem: Int
+field next: Ref
+
+predicate list(this: Ref) {
+  acc(this.elem) && acc(this.next) &&
+  (this.next != null ==> list(this.next))
+}
+
+function length(xs: Ref): Int
+    requires list(xs)
+    //:: ExpectedOutput(consistency.error)
+    decreases (list(xs)) // decreasing and bounded are not defined
+{
+    //:: ExpectedOutput(consistency.error)
+    unfolding list(xs) in xs.next == null ? 1 : length(xs.next) + 1
+     // loc domain and nested are not defined
+}

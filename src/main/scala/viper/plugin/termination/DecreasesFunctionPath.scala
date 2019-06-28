@@ -8,8 +8,9 @@ package viper.plugin.termination
 
 import viper.silver.ast
 import viper.silver.ast.Program
-import viper.plugin.termination.trafo.Trafo
-import viper.plugin.termination.trafo.util.FunctionCheckPath
+import viper.silver.plugin.DecreasesExp
+import viper.silver.plugin.trafo.Trafo
+import viper.silver.plugin.trafo.util.FunctionCheckPath
 
 /**
   * Adds termination checks to functions.

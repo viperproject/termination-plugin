@@ -6,10 +6,10 @@
 
 package viper.plugin.termination
 
-import viper.silver.ast.{Assert, Call, Exp, Method, NodeTrafo, PredicateAccess, PredicateAccessPredicate, Program, Function}
+import viper.silver.ast.{Assert, Call, Exp, Function, Method, NodeTrafo, PredicateAccess, PredicateAccessPredicate, Program}
 import viper.silver.ast.utility.{Functions, ViperStrategy}
 import viper.silver.parser._
-import viper.silver.plugin.SilverPlugin
+import viper.silver.plugin.{DecreasesExp, DecreasesStar, DecreasesTuple, SilverPlugin}
 import viper.silver.verifier.errors.AssertFailed
 import viper.silver.verifier.{ConsistencyError, Failure, Success, VerificationResult}
 
@@ -269,32 +269,11 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
         p.copy(domains = domains)(p.pos, p.info, p.errT)
       case f: Function =>
         // replace decreasesN calls in postconditions with DecreasesExp
-        val (dec1,post1) = f.posts.partition(p => p.isInstanceOf[viper.silver.plugin.trialplugin.DecreasesExp])
-        val dec2 = dec1.map{
-          case l: viper.silver.plugin.trialplugin.DecreasesTuple => {
-
-            val newArgs = l.extensionSubnodes map {
-              case p: Call if predFuncInverted.contains(p.callee) =>
-                val mapResult = predFuncInverted(p.callee)
-                assert(p.args.size - 1 == mapResult._2.size) // + permission argument
-              val pa = PredicateAccess(p.args.init, mapResult._1)(p.pos, p.info, p.errT)
-                PredicateAccessPredicate(pa, perm = p.args.last)(p.pos, p.info, p.errT)
-              case default => default
-            }
-
-            DecreasesTuple(newArgs)(l.pos,l.info,l.errT)}
-          case q: viper.silver.plugin.trialplugin.DecreasesStar => DecreasesStar()(q.pos,q.info,q.errT)
-        }
-        val posts = (post1 map createDecreasesExp) ++ dec2
+        val posts = f.posts map createDecreasesExp
         f.copy(posts = posts)(f.pos, f.info, f.errT)
       case m: Method =>
         // replace decreasesN calls in postconditions with DecreasesExp
-        val (dec1,post1) = m.posts.partition(p => p.isInstanceOf[viper.silver.plugin.trialplugin.DecreasesExp])
-        val dec2 = dec1.map{
-          case l: viper.silver.plugin.trialplugin.DecreasesTuple => DecreasesTuple(l.extensionSubnodes)(l.pos,l.info,l.errT)
-          case q: viper.silver.plugin.trialplugin.DecreasesStar => DecreasesStar()(q.pos,q.info,q.errT)
-        }
-        val posts = (post1 map createDecreasesExp) ++ dec2
+        val posts = m.posts map createDecreasesExp
         m.copy(posts = posts)(m.pos, m.info, m.errT)
     }).execute(input)
   }
@@ -353,8 +332,8 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
     * @return a program with the additional termination checks (including the input program)
     */
   def transformToCheckProgram(input: Program,
-                              functionDecreasesMap: Map[Function, DecreasesExp] = Map.empty[Function, DecreasesExp],
-                              methodDecreasesMap: Map[String, DecreasesExp] = Map.empty[String, DecreasesExp])
+                              functionDecreasesMap: Map[Function, DecreasesExp] /*= Map.empty[Function, DecreasesExp]*/,
+                              methodDecreasesMap: Map[String, DecreasesExp] /*= Map.empty[String, DecreasesExp]*/)
                               : Program
 
   /**
