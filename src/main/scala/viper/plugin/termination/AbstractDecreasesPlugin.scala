@@ -9,6 +9,7 @@ package viper.plugin.termination
 import viper.silver.ast.{Assert, Call, Exp, Function, Method, NodeTrafo, PredicateAccess, PredicateAccessPredicate, Program}
 import viper.silver.ast.utility.{Functions, ViperStrategy}
 import viper.silver.parser._
+import viper.silver.plugin.trialplugin.PDecreases
 import viper.silver.plugin.{DecreasesExp, DecreasesStar, DecreasesTuple, SilverPlugin}
 import viper.silver.verifier.errors.AssertFailed
 import viper.silver.verifier.{ConsistencyError, Failure, Success, VerificationResult}
@@ -67,6 +68,18 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
         // replace decreasesStar call
         // number of arguments is checked by the type checker.
         call.copy(func = PIdnUse(getDecreasesStarFunction)).setPos(call)
+      case dec: viper.silver.plugin.trialplugin.PDecreases => {
+        val newArgs = dec.params.map {
+          case predicateCall: PCall if input.predicates.exists(_.idndef.name == predicateCall.idnuse.name) =>
+            // a predicate with the same name exists
+            fixAccessPredicate(predicateCall)
+          case pap: PAccPred if input.predicates.exists(_.idndef.name == pap.loc.idnuse.name) =>
+            // a predicate with the same name exists
+            fixAccessPredicate(pap.loc, pap.perm)
+          case default => default
+        }
+        PDecreases(newArgs)
+      }
       case default => default
     }
 
