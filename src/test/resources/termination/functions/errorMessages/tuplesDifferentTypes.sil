@@ -5,7 +5,7 @@ import <decreases/importAllDec.sil>
 
 function f(i:Int, s: Set[Int]): Bool
 requires i>=0
-ensures decreases(i,s)
+decreasea(i,s)
 {
     //:: ExpectedOutput(termination.failed:termination.no.decrease)
     i == 0 ? true : g(s, i-1)
@@ -13,7 +13,7 @@ ensures decreases(i,s)
 
 function g(s: Set[Int], i: Int): Bool
 requires i >= 0
-ensures decreases(s, i)
+decreasea(s, i)
 {
     //:: ExpectedOutput(termination.failed:termination.no.decrease)
     i == 0 ? true : f(i-1, s)

@@ -272,6 +272,17 @@ trait AbstractDecreasesPlugin extends SilverPlugin {
           case default => default
         }
         DecreasesTuple(newArgs)(pos = c.pos, errT = NodeTrafo(c))
+      case d: DecreasesTuple =>
+        val newArgs = d.extensionSubnodes map {
+          // replace all predicate functions with the PredicateAccessPredicate
+          case p: Call if predFuncInverted.contains(p.callee) =>
+            val mapResult = predFuncInverted(p.callee)
+            assert(p.args.size - 1 == mapResult._2.size) // + permission argument
+          val pa = PredicateAccess(p.args.init, mapResult._1)(p.pos, p.info, p.errT)
+            PredicateAccessPredicate(pa, perm = p.args.last)(p.pos, p.info, p.errT)
+          case default => default
+        }
+        DecreasesTuple(newArgs)(pos = d.pos, errT = NodeTrafo(d))
       case p => p
     }
 

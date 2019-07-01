@@ -5,12 +5,12 @@ import <decreases/int_decreases.sil>
 
 function f(x: Int): Int
   requires 0 <= x
-  ensures decreases(x)
+  decreasea(x)
 //:: ExpectedOutput(termination.failed:termination.no.decrease)
 { x == 0 ? g(x+1) : f(x-1) }
 
 function g(y: Int): Int
   requires 0 <= y
-  ensures decreases(y)
+  decreasea(y)
 //:: ExpectedOutput(termination.failed:termination.no.decrease)
 { y == 0 ? f(y+1) : g(y-1) }

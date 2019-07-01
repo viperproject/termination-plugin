@@ -5,7 +5,7 @@ import <decreases/int_decreases.sil>
 
 //function with "decreases *" wont be tested
 function f1(x:Int): Int
-ensures decreasesStar()
+decreaseaStar()
 {
     f1(x) + f2(x)
 }

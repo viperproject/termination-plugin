@@ -7,7 +7,7 @@ import <decreases/int_decreases.sil>
 function ack(m:Int, n:Int):Int
 requires m >= 0
 requires n >= 0
-ensures decreases(tuple2Conn(m,n))
+decreasea(tuple2Conn(m,n))
 {
   m==0 ? n+1 :
     n==0 ?
@@ -20,7 +20,7 @@ function ackTuple(t: Tuple2[Int,Int]):Int
 requires first2(t) >= 0
 requires second2(t) >= 0
 requires second2(t) >= 0
-ensures decreases(t)
+decreasea(t)
 {
   first2(t)==0 ? second2(t)+1 :
     second2(t)==0 ?

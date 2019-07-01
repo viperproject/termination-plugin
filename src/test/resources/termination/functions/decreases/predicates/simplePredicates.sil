@@ -6,7 +6,7 @@ import <decreases/pred_decreases.sil>
 
 function f1(b:Bool): Bool
 requires p(b)
-ensures decreases(p(b))
+decreasea(p(b))
 {
   unfolding p(b) in (b ? f1(!b) : true)
 }
@@ -18,7 +18,7 @@ predicate p(b :Bool)
 
 function f2(s: Seq[Int]): Bool
 requires q(s)
-ensures decreases(q(s))
+decreasea(q(s))
 {
   unfolding q(s) in (|s|<3 ? f2(s[1..]) : true)
 }

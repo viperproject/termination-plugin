@@ -5,7 +5,7 @@ import <decreases/int_decreases.sil>
 
 function fib(n:Int):Int
  requires n >= 0
- ensures decreases(n)
+ decreasea(n)
  {
    n==0 ? 0 :
      n==1 ?

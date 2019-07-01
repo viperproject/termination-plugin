@@ -4,7 +4,6 @@
 import <decreases/int_decreases.sil>
 
 function f(x: Int): Int
-//:: ExpectedOutput(typechecker.error)
 decreasea m(x)
 {
   x == 0 ? 0 : f(x-1)
@@ -18,8 +17,8 @@ method m(x: Int) returns (res: Int)
 }
 
 function g(x: Int): Int
-//:: ExpectedOutput(typechecker.error)
-ensures decreasesStar(x)
+//:: ExpectedOutput(parser.error)
+decreaseaStar(x)
 {
   x == 0 ? 0 : g(x-1)
 }

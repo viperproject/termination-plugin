@@ -14,7 +14,7 @@ predicate list(this: Ref) {
 method traverse(this: Ref)
     requires acc(list(this), 1/2)
     ensures acc(list(this), 1/2)
-    ensures decreases(list(this))
+    decreasea (list(this))
 {
     unfold acc(list(this), 1/2)
         if (this.next != null)

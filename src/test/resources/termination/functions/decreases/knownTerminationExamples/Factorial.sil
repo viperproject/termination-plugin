@@ -5,7 +5,7 @@ import <decreases/int_decreases.sil>
 
 function fact(x:Int): Int
 requires x>=0
-ensures decreases(x)
+decreasea(x)
 {
     x==0 ? 1 : x*fact(x-1)
 }

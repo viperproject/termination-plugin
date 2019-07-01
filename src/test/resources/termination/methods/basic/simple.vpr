@@ -6,7 +6,7 @@ import <decreases/int_decreases.sil>
 method m(x: Int) returns (res:Int)
     requires x >= 0
     ensures res == x
-    ensures decreases(x)
+    decreasea(x)
 {
     if (x==0) {
         res := 0
@@ -18,7 +18,7 @@ method m(x: Int) returns (res:Int)
 }
 
 method mutual1(y: Int) returns (res: Int)
-    ensures decreases(y)
+    decreasea(y)
 {
     if (y <= 0) {
         res := 0
@@ -28,7 +28,7 @@ method mutual1(y: Int) returns (res: Int)
 }
 
 method mutual2(z: Int) returns (res: Int)
-    ensures decreases(z)
+    decreasea(z)
 {
     if (z <= 0) {
         res := 0
@@ -38,7 +38,7 @@ method mutual2(z: Int) returns (res: Int)
 }
 
 method non1(y: Int) returns (res: Int)
-    ensures decreases(y)
+    decreasea(y)
 {
     if (y <= 0) {
         res := 0
@@ -49,7 +49,7 @@ method non1(y: Int) returns (res: Int)
 }
 
 method non2(z: Int) returns (res: Int)
-    ensures decreases(z)
+    decreasea(z)
 {
     if (z <= 0) {
         res := 0

@@ -7,7 +7,7 @@ import <decreases/pred_decreases.sil>
 function f1(i: Int): Bool
 requires i >= 0
 requires p1(i)
-ensures decreases(p1(i))
+decreasea(p1(i))
 {
   unfolding p1(i) in (i>3 ? f1(i-1) : true)
 }
@@ -24,14 +24,14 @@ predicate q1(i :Int)
 
 function f2(i: Int): Int
 requires p2(i)
-ensures decreases(p2(i))
+decreasea(p2(i))
 {
     i > 0 ? unfolding p2(i) in g2(i-1) : -1
 }
 
 function g2(i: Int): Int
 requires p2(i)
-ensures decreases(p2(i))
+decreasea(p2(i))
 {
     i > 0 ? unfolding p2(i) in f2(i-1) : -1
 }

@@ -91,9 +91,9 @@ domain list {
   }
 }
 
-functionTerm f(xs:list) : Int
+function f(xs:list) : Int
 requires size(xs)>=0
 decreasea size(xs)
 {
-    size(xs) > 0 ?  DFCall f(tail_Cons(xs)) : 6
+    size(xs) > 0 ? f(tail_Cons(xs)) : 6
 }

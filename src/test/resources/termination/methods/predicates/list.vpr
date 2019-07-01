@@ -13,7 +13,7 @@ predicate list(this: Ref) {
 method append(this: Ref)
   requires list(this)
   ensures  list(this)
-  ensures decreases(list(this))
+  decreasea(list(this))
 {
   unfold list(this)
     if (this.next == null) {
