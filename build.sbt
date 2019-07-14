@@ -18,12 +18,15 @@ lazy val term = (project in file("."))
     name := "termination-plugin",
     organization := "viper",
     version := "0.1",
-    scalaVersion := "2.12.8",
+
+    // Run settings
+    run / javaOptions += "-Xss128m",
+
+    // Test settings
+    Test / javaOptions ++= (run / javaOptions).value,
+    fork := true, // See Silicon's build.sbt for details
       
-    fork := true,
-    // necessary for testing
-      
-      // Assembly settings
+    // Assembly settings
     assembly / assemblyJarName := "termination.jar",
     assembly / mainClass := None,
     assembly / test := {}
