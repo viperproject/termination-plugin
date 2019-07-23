@@ -67,7 +67,7 @@ trait FunctionCheckPath extends ProgramManager with DecreasesCheck with ExpTrans
 
       // replace all Result nodes with the result variable.
       val posts = f.posts.map(p => ViperStrategy.Slim({
-        case r@Result() => LocalVar(resultVariableName)(r.typ, r.pos, r.info, NodeTrafo(r))
+        case r: Result => LocalVar(resultVariableName, r.typ)(r.pos, r.info, NodeTrafo(r))
       }, Traverse.BottomUp).execute[Exp](p))
 
       // after the termination checks assume the postcondition.
